@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import crypto from "crypto";
 import { getDb } from "@/lib/mongodb";
-import { getSession, clearSessionCookie } from "@/lib/session";
+import { getSession, clearSessionCookie } from "@/lib/session.server";
 
 function sha256(s) {
   return crypto.createHash("sha256").update(String(s || "")).digest("hex");

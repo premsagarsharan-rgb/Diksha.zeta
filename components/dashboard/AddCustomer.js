@@ -1006,7 +1006,7 @@ function EntryCard({ onStart, onResume, hasDraft, lastAdded, c }) {
             <div className="absolute -inset-2 rounded-3xl -z-10" style={{ background: c.emptyIconGlow }} />
           </div>
         </div>
-        <h3 className="text-lg max-md:text-base font-bold" style={{ color: c.t1 }}>Add Customer</h3>
+        <h3 className="text-lg max-md:text-base font-bold" style={{ color: c.t1 }}>Add Asprirant</h3>
         <p className="text-[13px] max-md:text-[11px] mt-1" style={{ color: c.t3 }}>Manual entry → Saved in Recent (Today DB)</p>
 
         {hasDraft && (

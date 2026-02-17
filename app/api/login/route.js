@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { getDb } from "@/lib/mongodb";
-import { createSessionCookie } from "@/lib/session";
+import { createSessionCookie } from "@/lib/session.server";
 
 export const runtime = "nodejs";
 

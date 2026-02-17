@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import bcrypt from "bcryptjs";
 import { getDb } from "@/lib/mongodb";
-import { getSession } from "@/lib/session";
+import { getSession } from "@/lib/session.server";
 
 export const runtime = "nodejs";
 

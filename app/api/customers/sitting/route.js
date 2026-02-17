@@ -1,7 +1,7 @@
 // app/api/customers/sitting/route.js
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
-import { getSession } from "@/lib/session";
+import { getSession } from "@/lib/session.server";
 
 export const runtime = "nodejs";
 

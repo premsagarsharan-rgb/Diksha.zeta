@@ -6,7 +6,7 @@ import { useCT, getModeStyle, getLockStatus } from "./calanderTheme";
 import { useTheme } from "@/components/ThemeProvider";
 import ContainerStatsBar from "./ContainerStatsBar";
 import AssignmentCard from "./AssignmentCard";
-import HistorySection from "./HistorySection";
+import { HistorySection } from "./history";
 import ContainerLockBanner from "./ContainerLockBanner";
 import BufferSpinner from "@/components/BufferSpinner";
 
@@ -35,6 +35,7 @@ export default function ContainerPanel({
   onReject,
   onOut,
   onDone,
+  onChangeDate,
   onShowWarn,
   variant = "default", // "default" (desktop modal) | "inline" (mobile)
 }) {
@@ -130,6 +131,7 @@ export default function ContainerPanel({
               onReject={onReject}
               onOut={onOut}
               onDone={onDone}
+              onChangeDate={onChangeDate}
               onShowWarn={onShowWarn}
             />
           ))}
@@ -505,8 +507,16 @@ export default function ContainerPanel({
         <MobileStatsContent container={container} counts={counts} reservedCounts={reservedCounts} mode={mode} c={c} />
       ) : null}
 
-      {/* HISTORY tab */}
-      {isInline && mobileTab === "HISTORY" && mode === "MEETING" ? <HistorySection records={historyRecords} /> : null}
+      {/* HISTORY tab — Phase2: pass pendingCount + containerDate */}
+      {isInline && mobileTab === "HISTORY" && mode === "MEETING" ? (
+        <HistorySection
+          historyRecords={historyRecords}
+          onOpenProfile={onOpenProfile}
+          pendingCount={counts?.total || 0}
+          containerDate={container?.date || null}
+          variant="compact"
+        />
+      ) : null}
 
       {/* DESKTOP: Diksha => LEFT list + RIGHT blueprint */}
       {!isInline && mode === "DIKSHA" && blueprintPanel ? (
@@ -518,10 +528,16 @@ export default function ContainerPanel({
         <div style={{ marginTop: 12 }}>{isInline ? (mobileTab === "LIST" ? listContent : null) : listContent}</div>
       )}
 
-      {/* Desktop history below list */}
+      {/* Desktop history below list — Phase2: pass pendingCount + containerDate */}
       {!isInline && mode === "MEETING" && (historyRecords?.length || 0) > 0 ? (
         <div style={{ marginTop: 16 }}>
-          <HistorySection records={historyRecords} />
+          <HistorySection
+            historyRecords={historyRecords}
+            onOpenProfile={onOpenProfile}
+            pendingCount={counts?.total || 0}
+            containerDate={container?.date || null}
+            variant="default"
+          />
         </div>
       ) : null}
     </div>
@@ -565,29 +581,23 @@ function MobileActionsDock({ open, setOpen, actions, c, btnBg, btnBorder, btnTex
               width: baseSize,
               height: baseSize,
               borderRadius: 14,
-
-              // ✅ Black background applied
               background: btnBg,
               border: `1px solid ${btnBorder}`,
               color: btnText,
-
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontSize: 14,
               fontWeight: 800,
               cursor: !open || isDisabled ? "not-allowed" : "pointer",
-
               opacity: open ? (isDisabled ? 0.35 : 1) : 0,
               transform: open ? `translateX(-${offset}px)` : "translateX(0px)",
               pointerEvents: open ? "auto" : "none",
-
               transitionProperty: "transform, opacity",
               transitionDuration: "220ms, 160ms",
               transitionTimingFunction: "cubic-bezier(0.2, 0.8, 0.2, 1), ease",
               transitionDelay: open ? `${idx * 45}ms` : "0ms",
               willChange: "transform, opacity",
-
               zIndex: 200 - idx,
             }}
           >
@@ -607,12 +617,9 @@ function MobileActionsDock({ open, setOpen, actions, c, btnBg, btnBorder, btnTex
           width: baseSize,
           height: baseSize,
           borderRadius: 14,
-
-          // ✅ Black background applied
           background: btnBg,
           border: `1px solid ${btnBorder}`,
           color: btnText,
-
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -624,15 +631,9 @@ function MobileActionsDock({ open, setOpen, actions, c, btnBg, btnBorder, btnTex
           willChange: "transform",
           zIndex: 9999,
         }}
-        onPointerDown={(e) =>
-          (e.currentTarget.style.transform = open ? "rotate(90deg) scale(0.98)" : "scale(0.98)")
-        }
-        onPointerUp={(e) =>
-          (e.currentTarget.style.transform = open ? "rotate(90deg) scale(1.02)" : "rotate(0deg)")
-        }
-        onPointerLeave={(e) =>
-          (e.currentTarget.style.transform = open ? "rotate(90deg) scale(1.02)" : "rotate(0deg)")
-        }
+        onPointerDown={(e) => (e.currentTarget.style.transform = open ? "rotate(90deg) scale(0.98)" : "scale(0.98)")}
+        onPointerUp={(e) => (e.currentTarget.style.transform = open ? "rotate(90deg) scale(1.02)" : "rotate(0deg)")}
+        onPointerLeave={(e) => (e.currentTarget.style.transform = open ? "rotate(90deg) scale(1.02)" : "rotate(0deg)")}
       >
         {open ? "×" : "☰"}
       </button>

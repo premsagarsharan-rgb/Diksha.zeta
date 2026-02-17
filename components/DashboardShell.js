@@ -19,6 +19,9 @@ import Trash from "@/components/dashboard/Trash";
 import ScreensCreate from "@/components/dashboard/ScreenCreate";
 import ScreensViewer from "@/components/dashboard/ScreenViewer";
 
+// ✅ NEW: Today Meeting container summary card
+import MeetingTodayContainerWidget from "@/components/dashboard/MeetingTodayContainerWidget";
+
 /* ═══════════════════════════════════════════════
    THEME — Dual Color System
    ═══════════════════════════════════════════════ */
@@ -114,9 +117,16 @@ const T = {
 
 function normalizePerms(input) {
   const base = {
-    recent: true, add: true, calander: true, pending: true,
-    sitting: false, tracker: false, trash: true,
-    screensCreate: true, screensView: true, screens: true,
+    recent: true,
+    add: true,
+    calander: true,
+    pending: true,
+    sitting: false,
+    tracker: false,
+    trash: true,
+    screensCreate: true,
+    screensView: true,
+    screens: true,
     ...(input || {}),
   };
   if (typeof base.screens === "boolean") {
@@ -135,10 +145,20 @@ function getGreeting() {
 }
 
 const ICONS = {
-  recent: "📋", add: "➕", meeting: "📋", diksha: "🪔", pending: "⏸️",
-  sitting: "🪑", trash: "🗑️", tracker: "📍",
-  screensCreate: "🖥️", screensView: "👁️",
-  usercreate: "👤", usermanage: "⚙️",
+  recent: "📋",
+  add: "➕",
+  meeting: "📋",
+  diksha: "🪔",
+  pending: "⏸️",
+  sitting: "🪑",
+  trash: "🗑️",
+  tracker: "📍",
+  screensCreate: "🖥️",
+  screensView: "👁️",
+  usercreate: "👤",
+  usermanage: "⚙️",
+  // ✅ NEW (not used in MobileNav but fine)
+  meetingToday: "📌",
 };
 
 const NAV_KEYS = ["recent", "add", "meeting", "pending"];
@@ -161,23 +181,19 @@ function CalanderTile({ c, isLight, role, idx }) {
         animationDelay: `${idx * 50}ms`,
       }}
     >
-      {/* Inner content */}
       <div className="relative z-[1] w-full p-6 max-md:p-4">
-        {/* Icon + Title */}
         <div className="flex items-start justify-between mb-4">
           <div
             className="relative flex items-center justify-center rounded-2xl"
             style={{
-              width: 56, height: 56,
+              width: 56,
+              height: 56,
               background: c.iconBg,
               fontSize: 28,
             }}
           >
             📅
-            <div
-              className="absolute -inset-1 rounded-2xl"
-              style={{ background: c.iconGlow }}
-            />
+            <div className="absolute -inset-1 rounded-2xl" style={{ background: c.iconGlow }} />
           </div>
           <div
             className="hidden md:block w-2 h-2 rounded-full"
@@ -189,20 +205,13 @@ function CalanderTile({ c, isLight, role, idx }) {
           />
         </div>
 
-        <div
-          className="text-[10.5px] font-bold uppercase tracking-[0.8px] mb-1.5"
-          style={{ color: c.t3 }}
-        >
+        <div className="text-[10.5px] font-bold uppercase tracking-[0.8px] mb-1.5" style={{ color: c.t3 }}>
           Containers
         </div>
-        <div
-          className="text-[20px] max-md:text-[15px] font-extrabold tracking-[-0.4px] leading-tight mb-4"
-          style={{ color: c.t1 }}
-        >
+        <div className="text-[20px] max-md:text-[15px] font-extrabold tracking-[-0.4px] leading-tight mb-4" style={{ color: c.t1 }}>
           Calander
         </div>
 
-        {/* Two buttons side by side */}
         <div className="flex gap-3">
           <MeetingCalander role={role} />
           <DikshaCalander role={role} />
@@ -213,16 +222,46 @@ function CalanderTile({ c, isLight, role, idx }) {
 }
 
 /* ═══════════════════════════════════════════════
+   ✅ NEW: MeetingTodayTile — describes current date MEETING container
+   ═══════════════════════════════════════════════ */
+function MeetingTodayTile({ c, isLight, idx }) {
+  return (
+    <div
+      className="relative text-left"
+      style={{
+        borderRadius: isLight ? 22 : 24,
+        border: `1px solid ${c.bCard}`,
+        background: c.card,
+        boxShadow: isLight ? c.neu : c.glow,
+        color: c.t1,
+        overflow: "hidden",
+        animationDelay: `${idx * 50}ms`,
+      }}
+    >
+      <div className="relative z-[1] w-full p-3 md:p-4">
+<MeetingTodayContainerWidget embedded previewCount={6} />
+        <div style={{ marginTop: 10, fontSize: 11, color: c.t3 }}>
+          Tip: Open Meeting Calendar to manage / move cards.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
    Background — GPU Composited Only
    ═══════════════════════════════════════════════ */
 
-function BgLayer({ c, isLight }) {
+function BgLayer({ c }) {
   return (
     <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
       <div
         className="absolute will-change-transform"
         style={{
-          width: 550, height: 550, top: -180, left: -100,
+          width: 550,
+          height: 550,
+          top: -180,
+          left: -100,
           borderRadius: "50%",
           background: c.orbA,
           transform: "translateZ(0)",
@@ -232,7 +271,10 @@ function BgLayer({ c, isLight }) {
       <div
         className="absolute will-change-transform"
         style={{
-          width: 420, height: 420, top: "40%", right: -140,
+          width: 420,
+          height: 420,
+          top: "40%",
+          right: -140,
           borderRadius: "50%",
           background: c.orbB,
           transform: "translateZ(0)",
@@ -243,7 +285,10 @@ function BgLayer({ c, isLight }) {
       <div
         className="absolute will-change-transform"
         style={{
-          width: 360, height: 360, bottom: -100, left: "30%",
+          width: 360,
+          height: 360,
+          bottom: -100,
+          left: "30%",
           borderRadius: "50%",
           background: c.orbC,
           transform: "translateZ(0)",
@@ -276,7 +321,10 @@ function TileCard({ tile, onClick, c, isLight, idx }) {
   const onMove = useCallback((e) => {
     if (raf.current) return;
     raf.current = requestAnimationFrame(() => {
-      if (!ref.current) { raf.current = null; return; }
+      if (!ref.current) {
+        raf.current = null;
+        return;
+      }
       const r = ref.current.getBoundingClientRect();
       ref.current.style.setProperty("--mx", `${e.clientX - r.left}px`);
       ref.current.style.setProperty("--my", `${e.clientY - r.top}px`);
@@ -294,7 +342,8 @@ function TileCard({ tile, onClick, c, isLight, idx }) {
       type="button"
       className="group relative text-left outline-none transition-transform duration-200 ease-out flex"
       style={{
-        "--mx": "50%", "--my": "50%",
+        "--mx": "50%",
+        "--my": "50%",
         borderRadius: isLight ? 22 : 24,
         border: `1px solid ${c.bCard}`,
         background: c.card,
@@ -318,12 +367,8 @@ function TileCard({ tile, onClick, c, isLight, idx }) {
         el.style.borderColor = c.bCard;
         el.style.background = c.card;
       }}
-      onMouseDown={(e) => {
-        e.currentTarget.style.transform = "translateY(-2px) scale(0.985)";
-      }}
-      onMouseUp={(e) => {
-        e.currentTarget.style.transform = "translateY(-6px) scale(1.015)";
-      }}
+      onMouseDown={(e) => { e.currentTarget.style.transform = "translateY(-2px) scale(0.985)"; }}
+      onMouseUp={(e) => { e.currentTarget.style.transform = "translateY(-6px) scale(1.015)"; }}
     >
       <div
         className="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none"
@@ -346,16 +391,14 @@ function TileCard({ tile, onClick, c, isLight, idx }) {
           <div
             className="relative flex items-center justify-center rounded-2xl max-md:rounded-xl"
             style={{
-              width: 56, height: 56,
+              width: 56,
+              height: 56,
               background: c.iconBg,
               fontSize: 28,
             }}
           >
             {ICONS[tile.key] || "📦"}
-            <div
-              className="absolute -inset-1 rounded-2xl max-md:rounded-xl"
-              style={{ background: c.iconGlow }}
-            />
+            <div className="absolute -inset-1 rounded-2xl max-md:rounded-xl" style={{ background: c.iconGlow }} />
           </div>
           <div
             className="hidden md:block w-2 h-2 rounded-full"
@@ -367,29 +410,17 @@ function TileCard({ tile, onClick, c, isLight, idx }) {
           />
         </div>
         <div className="flex-1 min-w-0">
-          <div
-            className="text-[10.5px] font-bold uppercase tracking-[0.8px] mb-1.5 max-md:mb-0.5"
-            style={{ color: c.t3 }}
-          >
+          <div className="text-[10.5px] font-bold uppercase tracking-[0.8px] mb-1.5 max-md:mb-0.5" style={{ color: c.t3 }}>
             {tile.sub}
           </div>
-          <div
-            className="text-[20px] max-md:text-[15px] font-extrabold tracking-[-0.4px] leading-tight"
-            style={{ color: c.t1 }}
-          >
+          <div className="text-[20px] max-md:text-[15px] font-extrabold tracking-[-0.4px] leading-tight" style={{ color: c.t1 }}>
             {tile.title}
           </div>
         </div>
         <div className="hidden md:flex items-center justify-between mt-5">
-          <span
-            className="text-[12px] font-semibold flex items-center gap-1.5"
-            style={{ color: c.t3 }}
-          >
+          <span className="text-[12px] font-semibold flex items-center gap-1.5" style={{ color: c.t3 }}>
             Open
-            <span
-              className="inline-block transition-transform duration-200 group-hover:translate-x-2"
-              style={{ color: c.acc }}
-            >
+            <span className="inline-block transition-transform duration-200 group-hover:translate-x-2" style={{ color: c.acc }}>
               →
             </span>
           </span>
@@ -406,9 +437,7 @@ function TileCard({ tile, onClick, c, isLight, idx }) {
           className="md:hidden shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-200"
           style={{ background: c.glass, color: c.t3, fontSize: 16 }}
         >
-          <span className="group-hover:translate-x-0.5 inline-block transition-transform duration-200">
-            ›
-          </span>
+          <span className="group-hover:translate-x-0.5 inline-block transition-transform duration-200">›</span>
         </div>
       </div>
     </button>
@@ -454,10 +483,7 @@ function MoreSheet({ open, tiles, onSelect, onClose, c }) {
               onMouseEnter={(e) => { e.currentTarget.style.background = c.glass; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
             >
-              <div
-                className="w-11 h-11 rounded-xl flex items-center justify-center text-xl"
-                style={{ background: c.iconBg }}
-              >
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl" style={{ background: c.iconBg }}>
                 {ICONS[t.key] || "📦"}
               </div>
               <div className="flex-1 min-w-0">
@@ -481,11 +507,23 @@ function MobileNav({ tiles, onOpen, c }) {
   const [more, setMore] = useState(false);
   const pinned = useMemo(() => NAV_KEYS.map((k) => tiles.find((t) => t.key === k)).filter(Boolean), [tiles]);
 
-  const tap = (k) => { if (k === "__more__") setMore(true); else { setMore(false); onOpen(k); } };
+  const tap = (k) => {
+    if (k === "__more__") setMore(true);
+    else {
+      setMore(false);
+      onOpen(k);
+    }
+  };
 
   return (
     <>
-      <MoreSheet open={more} tiles={tiles} onSelect={(k) => { setMore(false); onOpen(k); }} onClose={() => setMore(false)} c={c} />
+      <MoreSheet
+        open={more}
+        tiles={tiles}
+        onSelect={(k) => { setMore(false); onOpen(k); }}
+        onClose={() => setMore(false)}
+        c={c}
+      />
       <nav
         className="md:hidden fixed bottom-0 left-0 right-0 z-[80] flex justify-around items-center h-[70px] border-t"
         style={{
@@ -551,19 +589,27 @@ export default function DashboardShell({ session }) {
   const c = isLight ? T.light : T.dark;
 
   const perms = useMemo(() => normalizePerms(session.permissions), [session.permissions]);
-  const can = useCallback((k) => {
-    if (isAdmin) return true;
-    if (k === "screensCreate") return !!(perms.screensCreate || perms.screens);
-    if (k === "screensView") return !!(perms.screensView || perms.screens);
-    return !!perms[k];
-  }, [isAdmin, perms]);
+  const can = useCallback(
+    (k) => {
+      if (isAdmin) return true;
+      if (k === "screensCreate") return !!(perms.screensCreate || perms.screens);
+      if (k === "screensView") return !!(perms.screensView || perms.screens);
+      return !!perms[k];
+    },
+    [isAdmin, perms]
+  );
 
   const tiles = useMemo(() => {
     const t = [];
     if (can("recent")) t.push({ key: "recent", title: "Recent", sub: "Today DB", C: RecentCustomer });
     if (can("add")) t.push({ key: "add", title: "Add Aspirant", sub: "Manual → Recent", C: AddCustomer });
-    // ─── Calander is now a special tile (no C / no modal) ───
+
+    // ✅ NEW: Meeting Today summary tile (special)
+    if (can("calander")) t.push({ key: "meetingToday", title: "Meeting Today", sub: "Auto Summary", special: true });
+
+    // ─── Calander tile ───
     if (can("calander")) t.push({ key: "calander", title: "Calander", sub: "Containers", special: true });
+
     if (can("pending")) t.push({ key: "pending", title: "Pending", sub: "Paused", C: Pending });
     if (can("sitting")) t.push({ key: "sitting", title: "Sitting", sub: "ACTIVE", C: SittingData });
     if (can("trash")) t.push({ key: "trash", title: "Trash", sub: "Rejected Cards", C: Trash });
@@ -575,12 +621,14 @@ export default function DashboardShell({ session }) {
     return t;
   }, [isAdmin, can]);
 
-  // ─── For mobile nav, map "meeting" key to calander tile ───
+  // For mobile nav, map "meeting" key to calander tile
   const mobileNavTiles = useMemo(() => {
-    return tiles.map((t) => {
-      if (t.key === "calander") return { ...t, key: "meeting", title: "Meeting" };
-      return t;
-    });
+    return tiles
+      .filter((t) => t.key !== "meetingToday") // ✅ hide summary tile from bottom nav
+      .map((t) => {
+        if (t.key === "calander") return { ...t, key: "meeting", title: "Meeting" };
+        return t;
+      });
   }, [tiles]);
 
   const [openKey, setOpenKey] = useState(null);
@@ -588,13 +636,9 @@ export default function DashboardShell({ session }) {
   const ActiveComp = active?.C;
   const greeting = useMemo(() => getGreeting(), []);
 
-  // ─── Mobile nav handler: "meeting" opens meeting calander modal directly ───
   function handleMobileNavOpen(key) {
     if (key === "meeting") {
-      // On mobile nav tap "Meeting", we don't open LayerModal
-      // Instead the MeetingCalander button inside CalanderTile handles it
-      // So we just scroll to the calander tile or do nothing special
-      // But for better UX, let's not set openKey for special tiles
+      // MeetingCalander/DikshaCalander buttons are inside CalanderTile
       return;
     }
     setOpenKey(key);
@@ -602,9 +646,9 @@ export default function DashboardShell({ session }) {
 
   return (
     <div className="min-h-screen relative" style={{ background: c.page, color: c.t1 }}>
-      <BgLayer c={c} isLight={isLight} />
+      <BgLayer c={c} />
 
-      {/* ═══ DESKTOP TOPBAR ═══ */}
+      {/* DESKTOP TOPBAR */}
       <header
         className="hidden md:block sticky top-0 z-40 border-b transition-colors duration-300"
         style={{
@@ -639,7 +683,9 @@ export default function DashboardShell({ session }) {
 
           <div className="flex items-center gap-3">
             <div className="text-right mr-1">
-              <div className="text-[13px] font-bold" style={{ color: c.t1 }}>{session.username}</div>
+              <div className="text-[13px] font-bold" style={{ color: c.t1 }}>
+                {session.username}
+              </div>
               <div
                 className="text-[9.5px] uppercase tracking-[0.5px] font-bold"
                 style={{ color: session.role === "ADMIN" ? "#f59e0b" : c.t3 }}
@@ -682,7 +728,7 @@ export default function DashboardShell({ session }) {
         </div>
       </header>
 
-      {/* ═══ MOBILE HEADER ═══ */}
+      {/* MOBILE HEADER */}
       <header
         className="md:hidden sticky top-0 z-40 flex items-center justify-between px-4 py-3 border-b"
         style={{
@@ -698,10 +744,7 @@ export default function DashboardShell({ session }) {
             style={{ background: c.accGBtn }}
           >
             {session.username?.[0]?.toUpperCase() || "U"}
-            <div
-              className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full"
-              style={{ background: "#22c55e", border: `2px solid ${c.dot}` }}
-            />
+            <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full" style={{ background: "#22c55e", border: `2px solid ${c.dot}` }} />
           </div>
           <div>
             <div className="text-[13px] font-extrabold" style={{ color: c.t1 }}>{session.username}</div>
@@ -726,39 +769,29 @@ export default function DashboardShell({ session }) {
         </div>
       </header>
 
-      {/* ═══ MAIN ═══ */}
+      {/* MAIN */}
       <main className="relative z-[1] max-w-[1320px] mx-auto px-7 max-md:px-4 py-8 max-md:py-5 pb-28 max-md:pb-[110px]">
-        {/* Greeting */}
         <div className="mb-9 max-md:mb-5">
           <div className="text-[13px] max-md:text-[12px] font-medium mb-1" style={{ color: c.t3 }}>
             {greeting}, {session.username} Sakhi
           </div>
-          <div
-            className="text-[32px] max-md:text-[22px] font-black tracking-[-0.5px] flex items-center gap-3 flex-wrap"
-            style={{ color: c.t1 }}
-          >
+          <div className="text-[32px] max-md:text-[22px] font-black tracking-[-0.5px] flex items-center gap-3 flex-wrap" style={{ color: c.t1 }}>
             Dashboard
-            <span
-              className="text-[10px] px-3 py-1 rounded-full text-white font-bold uppercase tracking-[0.5px]"
-              style={{ background: c.accGBtn }}
-            >
+            <span className="text-[10px] px-3 py-1 rounded-full text-white font-bold uppercase tracking-[0.5px]" style={{ background: c.accGBtn }}>
               DIKSHA
             </span>
           </div>
         </div>
 
-        {/* Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 max-md:gap-3">
-          {tiles.map((t, i) =>
-            t.special ? (
-              <CalanderTile
-                key={t.key}
-                c={c}
-                isLight={isLight}
-                role={session.role}
-                idx={i}
-              />
-            ) : (
+          {tiles.map((t, i) => {
+            if (t.special && t.key === "meetingToday") {
+              return <MeetingTodayTile key={t.key} c={c} isLight={isLight} idx={i} />;
+            }
+            if (t.special && t.key === "calander") {
+              return <CalanderTile key={t.key} c={c} isLight={isLight} role={session.role} idx={i} />;
+            }
+            return (
               <TileCard
                 key={t.key}
                 tile={t}
@@ -767,17 +800,15 @@ export default function DashboardShell({ session }) {
                 isLight={isLight}
                 onClick={() => setOpenKey(t.key)}
               />
-            )
-          )}
+            );
+          })}
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="hidden md:block relative z-[1] text-center py-8 text-[11px]" style={{ color: c.t3 }}>
         ⚡ DIKSHA RKK · Seva Sabse Pehle🙏
       </footer>
 
-      {/* Mobile Nav */}
       <MobileNav tiles={mobileNavTiles} onOpen={handleMobileNavOpen} c={c} />
 
       {/* LayerModal — only for non-special tiles */}
@@ -795,7 +826,6 @@ export default function DashboardShell({ session }) {
         {ActiveComp ? <ActiveComp role={session.role} session={session} /> : null}
       </LayerModal>
 
-      {/* ═══ KEYFRAMES ═══ */}
       <style jsx global>{`
         @keyframes orb1 {
           0%,100%{transform:translate3d(0,0,0) scale(1)}

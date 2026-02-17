@@ -17,6 +17,7 @@ import CalanderDayStrip from "./calander/CalanderDayStrip";
 import CalanderMonthGrid from "./calander/CalanderMonthGrid";
 import ContainerPanel from "./calander/ContainerPanel";
 import AddCustomerSheet from "./calander/AddCustomerSheet";
+import { ChangeDateModal } from "./calander/changeDate";
 
 const MODE = "DIKSHA";
 
@@ -27,7 +28,6 @@ function ymdLocal(d) {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
-
 function monthCells(year, month) {
   const first = new Date(year, month, 1);
   const startDay = first.getDay();
@@ -38,16 +38,16 @@ function monthCells(year, month) {
   while (cells.length % 7 !== 0) cells.push(null);
   return cells;
 }
-
 function safeId(x) {
   if (!x) return "";
   if (typeof x === "string") return x;
   if (typeof x === "object" && x.$oid) return String(x.$oid);
   return String(x);
 }
-
 function countGenders(list) {
-  let male = 0, female = 0, other = 0;
+  let male = 0,
+    female = 0,
+    other = 0;
   for (const a of list || []) {
     const g = a?.customer?.gender;
     if (g === "MALE") male++;
@@ -107,6 +107,11 @@ export default function DikshaCalander({ role }) {
   const [profileCustomer, setProfileCustomer] = useState(null);
   const [profileSeqNo, setProfileSeqNo] = useState(null);
 
+  /* ── Change Date ── */
+  const [changeDateOpen, setChangeDateOpen] = useState(false);
+  const [changeDateAssignment, setChangeDateAssignment] = useState(null);
+  const [changeDateGroupMembers, setChangeDateGroupMembers] = useState([]);
+
   /* ── Warning ── */
   const [warnOpen, setWarnOpen] = useState(false);
   const [warnTitle, setWarnTitle] = useState("Warning");
@@ -124,14 +129,24 @@ export default function DikshaCalander({ role }) {
       "Family assigned",
       "Out from container",
       "Diksha Done (Qualified)",
+      "Card moved to different date",
+      "Date changed — schedule adjustment",
+      "Card moved — customer request",
     ],
   });
 
   /* ── Error Handler ── */
   function handleApiError(data, fallback = "Failed") {
     if (!data?.error) return showWarn("Error", fallback);
-    if (data.error === "HOUSEFULL") { setHousefull(true); return; }
-    if (data.error === "NOT_ELIGIBLE_FOR_DIKSHA") return showWarn("Not Eligible", "Pehle Meeting me Confirm karo ya Reject→Pending flow se eligible banao.");
+    if (data.error === "HOUSEFULL") {
+      setHousefull(true);
+      return;
+    }
+    if (data.error === "NOT_ELIGIBLE_FOR_DIKSHA")
+      return showWarn(
+        "Not Eligible",
+        "Pehle Meeting me Confirm karo ya Reject→Pending flow se eligible banao."
+      );
     if (data.error === "LOCKED_QUALIFIED") return showWarn("Locked", "Card QUALIFIED ho chuka hai.");
     return showWarn("Error", data.error || fallback);
   }
@@ -149,8 +164,9 @@ export default function DikshaCalander({ role }) {
       setSummary({});
     }
   }
-
-  useEffect(() => { loadSummary(); }, [year, month]);
+  useEffect(() => {
+    loadSummary();
+  }, [year, month]);
 
   function isDesktopNow() {
     if (typeof window === "undefined") return true;
@@ -201,6 +217,32 @@ export default function DikshaCalander({ role }) {
     setHistoryRecords(dData.history || []);
   }
 
+  /* ─────────────────────────────────────────────
+     ✅ P2-3 NEW: Listen history "Open Diksha Date"
+     Event: CALANDER_OPEN_DIKSHA_DATE { detail: { date: "YYYY-MM-DD" } }
+     ───────────────────────────────────────────── */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    function onOpenDiksha(ev) {
+      const dateStr = ev?.detail?.date;
+      if (typeof dateStr !== "string") return;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
+
+      const [yy, mm] = dateStr.split("-").map((n) => parseInt(n, 10));
+      if (!Number.isFinite(yy) || !Number.isFinite(mm)) return;
+
+      setAnchor(new Date(yy, mm - 1, 1));
+      setCalOpen(true);
+
+      const openLayer = isDesktopNow(); // desktop: open Layer 2 container
+      openContainerForDate(dateStr, { openLayer });
+    }
+
+    window.addEventListener("CALANDER_OPEN_DIKSHA_DATE", onOpenDiksha);
+    return () => window.removeEventListener("CALANDER_OPEN_DIKSHA_DATE", onOpenDiksha);
+  }, []);
+
   /* ── Add Customer ── */
   async function openAddCustomerLayer() {
     setHousefull(false);
@@ -213,7 +255,7 @@ export default function DikshaCalander({ role }) {
     const sitRes = await fetch("/api/customers/sitting");
     const sitData = await sitRes.json().catch(() => ({}));
     if (!sitRes.ok) return handleApiError(sitData, "Failed to load sitting customers");
-    setSittingActive((sitData.items || []).filter((c) => c.status === "ACTIVE"));
+    setSittingActive((sitData.items || []).filter((cc) => cc.status === "ACTIVE"));
   }
 
   function initiateSingleAssign(customerId) {
@@ -223,21 +265,29 @@ export default function DikshaCalander({ role }) {
 
   async function confirmSinglePush() {
     if (!container?._id || !singleTargetId) return;
-    const commitMessage = await requestCommit({ title: "Assign Single to Diksha", preset: "Assigned customer to container" }).catch(() => null);
+    const commitMessage = await requestCommit({
+      title: "Assign Single to Diksha",
+      preset: "Assigned customer to container",
+    }).catch(() => null);
     if (!commitMessage) return;
     const cId = safeId(container._id);
     if (!cId) return;
     setPushing(true);
     try {
       const res = await fetch(`/api/calander/container/${cId}/assign`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ customerId: singleTargetId, source: "SITTING", note: "", commitMessage }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return handleApiError(data, "Assign failed");
-      await refreshContainer(); await loadSummary();
-      setConfirmSingleOpen(false); setAddOpen(false);
-    } finally { setPushing(false); }
+      await refreshContainer();
+      await loadSummary();
+      setConfirmSingleOpen(false);
+      setAddOpen(false);
+    } finally {
+      setPushing(false);
+    }
   }
 
   function initiateFamilyAssign() {
@@ -250,21 +300,29 @@ export default function DikshaCalander({ role }) {
     const ids = selectedIds.map(safeId).filter(Boolean);
     if (ids.length < 2) return showWarn("Select Customers", "Minimum 2 required");
     const isCouple = ids.length === 2;
-    const commitMessage = await requestCommit({ title: isCouple ? "Assign Couple" : "Assign Family", preset: isCouple ? "Couple assigned" : "Family assigned" }).catch(() => null);
+    const commitMessage = await requestCommit({
+      title: isCouple ? "Assign Couple" : "Assign Family",
+      preset: isCouple ? "Couple assigned" : "Family assigned",
+    }).catch(() => null);
     if (!commitMessage) return;
     const cId = safeId(container._id);
     if (!cId) return;
     setPushing(true);
     try {
       const res = await fetch(`/api/calander/container/${cId}/assign-couple`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ customerIds: ids, note: "", commitMessage }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return handleApiError(data, "Family assign failed");
-      await refreshContainer(); await loadSummary();
-      setConfirmFamilyOpen(false); setAddOpen(false);
-    } finally { setPushing(false); }
+      await refreshContainer();
+      await loadSummary();
+      setConfirmFamilyOpen(false);
+      setAddOpen(false);
+    } finally {
+      setPushing(false);
+    }
   }
 
   /* ── Out / Done ── */
@@ -275,30 +333,40 @@ export default function DikshaCalander({ role }) {
     const commitMessage = await requestCommit({ title: "Out", preset: "Out from container" }).catch(() => null);
     if (!commitMessage) return;
     const res = await fetch(`/api/calander/container/${cId}/assignments/${aId}/out`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ commitMessage }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return handleApiError(data, "Out failed");
-    await refreshContainer(); await loadSummary();
+    await refreshContainer();
+    await loadSummary();
   }
 
   async function doneAssignment(assignment) {
     const cId = safeId(container?._id);
     const aId = safeId(assignment?._id);
     if (!cId || !aId) return;
-    const commitMessage = await requestCommit({ title: "Done (Qualified)", subtitle: "Card locked forever.", preset: "Diksha Done (Qualified)" }).catch(() => null);
+    const commitMessage = await requestCommit({
+      title: "Done (Qualified)",
+      subtitle: "Card locked forever.",
+      preset: "Diksha Done (Qualified)",
+    }).catch(() => null);
     if (!commitMessage) return;
     setPushing(true);
     try {
       const res = await fetch(`/api/calander/container/${cId}/assignments/${aId}/done`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ commitMessage }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return handleApiError(data, "Done failed");
-      await refreshContainer(); await loadSummary();
-    } finally { setPushing(false); }
+      await refreshContainer();
+      await loadSummary();
+    } finally {
+      setPushing(false);
+    }
   }
 
   /* ── Admin Limit ── */
@@ -311,11 +379,13 @@ export default function DikshaCalander({ role }) {
     const limit = parseInt(next, 10);
     if (!Number.isFinite(limit) || limit < 1) return showWarn("Invalid", "Invalid limit");
     const res = await fetch(`/api/calander/container/${cId}/limit`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ limit }),
     });
     if (!res.ok) return showWarn("Failed", "Limit update failed");
-    await refreshContainer(); await loadSummary();
+    await refreshContainer();
+    await loadSummary();
   }
 
   /* ── Unlock Container ── */
@@ -323,7 +393,8 @@ export default function DikshaCalander({ role }) {
     const cId = safeId(container?._id);
     if (!cId) return;
     const res = await fetch(`/api/calander/container/${cId}/unlock`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ minutes }),
     });
     if (!res.ok) {
@@ -331,6 +402,76 @@ export default function DikshaCalander({ role }) {
       return showWarn("Unlock Failed", data.error || "Could not unlock container");
     }
     await refreshContainer();
+  }
+
+  /* ── Change Date ── */
+  async function openChangeDateModal(assignment) {
+    if (!assignment?._id || !container?._id) return;
+
+    const enriched = { ...assignment, _containerDate: container.date };
+
+    let groupMembers = [enriched];
+    if ((assignment.kind === "COUPLE" || assignment.kind === "FAMILY") && assignment.pairId) {
+      groupMembers = assignments
+        .filter((a) => a.pairId && String(a.pairId) === String(assignment.pairId) && a.status === "IN_CONTAINER")
+        .map((a) => ({ ...a, _containerDate: container.date }));
+      if (groupMembers.length === 0) groupMembers = [enriched];
+    }
+
+    setChangeDateAssignment(enriched);
+    setChangeDateGroupMembers(groupMembers);
+    setChangeDateOpen(true);
+  }
+
+  async function executeChangeDate(containerId, assignmentId, payload) {
+    setPushing(true);
+    try {
+      const res = await fetch(`/api/calander/container/${containerId}/assignments/${assignmentId}/change-date`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (data.error === "COOLDOWN_ACTIVE") {
+          showWarn("⏰ Cooldown Active", `Please wait ${data.remainingSec}s before moving again.`);
+          return;
+        }
+        if (data.error === "STALE_DATA") {
+          showWarn("🔄 Stale Data", "Card was modified by someone else. Refreshing...");
+          await refreshContainer();
+          await loadSummary();
+          return;
+        }
+        if (data.error === "RACE_CONDITION") {
+          showWarn("⚠️ Conflict", data.message || "Card was moved by another user.");
+          await refreshContainer();
+          await loadSummary();
+          return;
+        }
+        if (data.error === "TARGET_HOUSEFULL") {
+          showWarn("🚫 Target Full", data.message || "Target container is full.");
+          return;
+        }
+        if (data.error === "DATE_CROSSES_OCCUPIED") {
+          showWarn("❌ Invalid Date", data.message || "Date crosses occupied boundary.");
+          return;
+        }
+        if (data.error === "LOCKED_QUALIFIED") {
+          showWarn("👑 Locked", "Card is QUALIFIED and cannot be moved.");
+          return;
+        }
+        return handleApiError(data, "Change date failed");
+      }
+
+      setChangeDateOpen(false);
+      setChangeDateAssignment(null);
+      setChangeDateGroupMembers([]);
+      await refreshContainer();
+      await loadSummary();
+    } finally {
+      setPushing(false);
+    }
   }
 
   /* ── Profile ── */
@@ -346,21 +487,30 @@ export default function DikshaCalander({ role }) {
     if (!container?._id) return showWarn("Error", "Container not ready");
     if (!assignments?.length) return showWarn("Error", "No customers");
     const title = `${container.date} / DIKSHA`;
-    const items = assignments.map((a, idx) => ({ customer: a.customer || {}, form: a.customer || {}, sequenceNo: idx + 1 }));
+    const items = assignments.map((a, idx) => ({
+      customer: a.customer || {},
+      form: a.customer || {},
+      sequenceNo: idx + 1,
+    }));
     await openForm2PrintAllPreview({ title, items, source: "SITTING" });
   }
 
   async function openPrintListForContainer() {
     if (!container?._id) return showWarn("Error", "Container not ready");
     if (!(assignments?.length || reserved?.length)) return showWarn("Error", "No customers");
-    await openContainerListPrintPreview({ title: `${container.date} / DIKSHA • List`, container, assignments, reserved });
+    await openContainerListPrintPreview({
+      title: `${container.date} / DIKSHA • List`,
+      container,
+      assignments,
+      reserved,
+    });
   }
 
   /* ── Derived ── */
   const counts = countGenders(assignments);
   const reservedCounts = countGenders(reserved);
   const targetSingle = useMemo(() => {
-    return singleTargetId ? sittingActive.find((c) => safeId(c._id) === singleTargetId) : null;
+    return singleTargetId ? sittingActive.find((cc) => safeId(cc._id) === singleTargetId) : null;
   }, [singleTargetId, sittingActive]);
 
   /* ── Mobile auto-open ── */
@@ -381,89 +531,229 @@ export default function DikshaCalander({ role }) {
     <div>
       {/* ── Entry Button ── */}
       <button
-        onClick={() => { setAnchor(new Date()); setCalOpen(true); }}
+        onClick={() => {
+          setAnchor(new Date());
+          setCalOpen(true);
+        }}
         type="button"
         style={{
-          padding: "12px 22px", borderRadius: 20,
-          background: ms.bg, border: `1px solid ${ms.border}`,
-          color: ms.text, fontSize: 14, fontWeight: 600,
-          cursor: "pointer", transition: "all 0.15s",
-          display: "flex", alignItems: "center", gap: 8,
+          padding: "12px 22px",
+          borderRadius: 20,
+          background: ms.bg,
+          border: `1px solid ${ms.border}`,
+          color: ms.text,
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: "pointer",
+          transition: "all 0.15s",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; e.currentTarget.style.opacity = "0.9"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.transform = ""; e.currentTarget.style.opacity = ""; }}
-        onPointerDown={(e) => (e.currentTarget.style.transform = "scale(0.97)")}
-        onPointerUp={(e) => (e.currentTarget.style.transform = "")}
       >
         🔱 Diksha Calendar
       </button>
 
       {/* Warning */}
-      <LayerModal open={warnOpen} layerName="Warning" title={warnTitle} sub="" onClose={() => setWarnOpen(false)} maxWidth="max-w-md">
+      <LayerModal
+        open={warnOpen}
+        layerName="Warning"
+        title={warnTitle}
+        sub=""
+        onClose={() => setWarnOpen(false)}
+        maxWidth="max-w-md"
+      >
         <div style={{ borderRadius: 18, border: `1px solid ${c.surfaceBorder}`, background: c.surfaceBg, padding: 16 }}>
           <div style={{ fontSize: 13, color: c.t2, whiteSpace: "pre-wrap" }}>{warnMsg}</div>
           <div style={{ marginTop: 16 }}>
-            <button type="button" onClick={() => setWarnOpen(false)} style={{ width: "100%", padding: "12px 16px", borderRadius: 18, background: c.btnSolidBg, color: c.btnSolidText, fontWeight: 600, border: "none", cursor: "pointer" }}>OK</button>
+            <button
+              type="button"
+              onClick={() => setWarnOpen(false)}
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                borderRadius: 18,
+                background: c.btnSolidBg,
+                color: c.btnSolidText,
+                fontWeight: 600,
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              OK
+            </button>
           </div>
         </div>
       </LayerModal>
 
       {/* Layer 1: Calendar */}
       <LayerModal
-        open={calOpen} layerName="Diksha" title="🔱 Diksha Calendar"
+        open={calOpen}
+        layerName="Diksha"
+        title="🔱 Diksha Calendar"
         sub="Desktop: Monthly Grid • Mobile: Day Strip"
-        onClose={() => { setCalOpen(false); setContainerOpen(false); setAddOpen(false); setConfirmSingleOpen(false); setConfirmFamilyOpen(false); }}
+        onClose={() => {
+          setCalOpen(false);
+          setContainerOpen(false);
+          setAddOpen(false);
+          setConfirmSingleOpen(false);
+          setConfirmFamilyOpen(false);
+          setChangeDateOpen(false);
+        }}
         maxWidth="max-w-5xl"
       >
-        <CalanderHeader anchor={anchor} mode={MODE} onPrevMonth={() => setAnchor(new Date(year, month - 1, 1))} onNextMonth={() => setAnchor(new Date(year, month + 1, 1))} />
+        <CalanderHeader
+          anchor={anchor}
+          mode={MODE}
+          onPrevMonth={() => setAnchor(new Date(year, month - 1, 1))}
+          onNextMonth={() => setAnchor(new Date(year, month + 1, 1))}
+        />
 
-        <CalanderMobileHero container={container} mode={MODE} selectedDate={selectedDate} todayStr={todayStr} counts={counts} reservedCounts={reservedCounts} historyCount={0} loading={containerLoading} />
+        <CalanderMobileHero
+          container={container}
+          mode={MODE}
+          selectedDate={selectedDate}
+          todayStr={todayStr}
+          counts={counts}
+          reservedCounts={reservedCounts}
+          historyCount={0}
+          loading={containerLoading}
+        />
 
-        <CalanderDayStrip monthDays={monthDays} selectedDate={selectedDate} todayStr={todayStr} summary={summary} mode={MODE} onDateSelect={(d) => openContainerForDate(d, { openLayer: false })} />
+        <CalanderDayStrip
+          monthDays={monthDays}
+          selectedDate={selectedDate}
+          todayStr={todayStr}
+          summary={summary}
+          mode={MODE}
+          onDateSelect={(d) => openContainerForDate(d, { openLayer: false })}
+        />
 
         <div className="block md:hidden">
           <ContainerPanel
-            container={container} assignments={assignments} reserved={reserved} historyRecords={[]}
-            counts={counts} reservedCounts={reservedCounts} mode={MODE} role={role} pushing={pushing}
-            housefull={housefull} containerLoading={containerLoading} selectedDate={selectedDate}
-            showList={showList} onToggleList={() => setShowList((v) => !v)}
-            onOpenAdd={openAddCustomerLayer} onIncreaseLimit={increaseLimit}
+            container={container}
+            assignments={assignments}
+            reserved={reserved}
+            historyRecords={[]}
+            counts={counts}
+            reservedCounts={reservedCounts}
+            mode={MODE}
+            role={role}
+            pushing={pushing}
+            housefull={housefull}
+            containerLoading={containerLoading}
+            selectedDate={selectedDate}
+            showList={showList}
+            onToggleList={() => setShowList((v) => !v)}
+            onOpenAdd={openAddCustomerLayer}
+            onIncreaseLimit={increaseLimit}
             onUnlockContainer={unlockContainer}
-            onPrintAll={openPrintAllForContainer} onPrintList={openPrintListForContainer}
-            onOpenProfile={openProfile} onConfirm={null} onReject={null}
-            onOut={outAssignment} onDone={doneAssignment} onShowWarn={showWarn} variant="inline"
+            onPrintAll={openPrintAllForContainer}
+            onPrintList={openPrintListForContainer}
+            onOpenProfile={openProfile}
+            onConfirm={null}
+            onReject={null}
+            onOut={outAssignment}
+            onDone={doneAssignment}
+            onChangeDate={openChangeDateModal}
+            onShowWarn={showWarn}
+            variant="inline"
           />
         </div>
 
-        <CalanderMonthGrid cells={cells} month={month} selectedDate={selectedDate} todayStr={todayStr} summary={summary} mode={MODE} onDateSelect={(d) => openContainerForDate(d, { openLayer: true })} />
+        <CalanderMonthGrid
+          cells={cells}
+          month={month}
+          selectedDate={selectedDate}
+          todayStr={todayStr}
+          summary={summary}
+          mode={MODE}
+          onDateSelect={(d) => openContainerForDate(d, { openLayer: true })}
+        />
       </LayerModal>
 
       {/* Layer 2: Container Desktop */}
       <LayerModal
-        open={containerOpen && !!container} layerName="Container"
+        open={containerOpen && !!container}
+        layerName="Container"
         title={container ? `${container.date} / DIKSHA` : "Container"}
         sub={`IN ${counts.total} • Reserved ${reservedCounts.total} • Limit ${container?.limit || 20}`}
-        onClose={() => { setContainerOpen(false); setAddOpen(false); setConfirmSingleOpen(false); setConfirmFamilyOpen(false); setContainer(null); setAssignments([]); setReserved([]); setHistoryRecords([]); }}
+        onClose={() => {
+          setContainerOpen(false);
+          setAddOpen(false);
+          setConfirmSingleOpen(false);
+          setConfirmFamilyOpen(false);
+          setChangeDateOpen(false);
+          setContainer(null);
+          setAssignments([]);
+          setReserved([]);
+          setHistoryRecords([]);
+        }}
         maxWidth="max-w-5xl"
       >
         <ContainerPanel
-          container={container} assignments={assignments} reserved={reserved} historyRecords={[]}
-          counts={counts} reservedCounts={reservedCounts} mode={MODE} role={role} pushing={pushing}
-          housefull={housefull} containerLoading={containerLoading} selectedDate={selectedDate}
-          showList={showList} onToggleList={() => setShowList((v) => !v)}
-          onOpenAdd={openAddCustomerLayer} onIncreaseLimit={increaseLimit}
+          container={container}
+          assignments={assignments}
+          reserved={reserved}
+          historyRecords={[]}
+          counts={counts}
+          reservedCounts={reservedCounts}
+          mode={MODE}
+          role={role}
+          pushing={pushing}
+          housefull={housefull}
+          containerLoading={containerLoading}
+          selectedDate={selectedDate}
+          showList={showList}
+          onToggleList={() => setShowList((v) => !v)}
+          onOpenAdd={openAddCustomerLayer}
+          onIncreaseLimit={increaseLimit}
           onUnlockContainer={unlockContainer}
-          onPrintAll={openPrintAllForContainer} onPrintList={openPrintListForContainer}
-          onOpenProfile={openProfile} onConfirm={null} onReject={null}
-          onOut={outAssignment} onDone={doneAssignment} onShowWarn={showWarn} variant="default"
+          onPrintAll={openPrintAllForContainer}
+          onPrintList={openPrintListForContainer}
+          onOpenProfile={openProfile}
+          onConfirm={null}
+          onReject={null}
+          onOut={outAssignment}
+          onDone={doneAssignment}
+          onChangeDate={openChangeDateModal}
+          onShowWarn={showWarn}
+          variant="default"
         />
       </LayerModal>
 
       {/* Add Customer */}
-      <AddCustomerSheet open={addOpen} onClose={() => { setAddOpen(false); setConfirmSingleOpen(false); setConfirmFamilyOpen(false); }} sittingActive={sittingActive} pickMode={pickMode} onPickModeChange={(m) => { setPickMode(m); setSelectedIds([]); }} selectedIds={selectedIds} onToggleSelect={(id) => setSelectedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])} pushing={pushing} onInitiateSingle={initiateSingleAssign} onInitiateFamily={initiateFamilyAssign} />
+      <AddCustomerSheet
+        open={addOpen}
+        onClose={() => {
+          setAddOpen(false);
+          setConfirmSingleOpen(false);
+          setConfirmFamilyOpen(false);
+        }}
+        sittingActive={sittingActive}
+        pickMode={pickMode}
+        onPickModeChange={(m) => {
+          setPickMode(m);
+          setSelectedIds([]);
+        }}
+        selectedIds={selectedIds}
+        onToggleSelect={(id) =>
+          setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+        }
+        pushing={pushing}
+        onInitiateSingle={initiateSingleAssign}
+        onInitiateFamily={initiateFamilyAssign}
+      />
 
       {/* Confirm Single */}
-      <LayerModal open={confirmSingleOpen} layerName="Confirm Single" title="Confirm Single" sub="Review → Push" onClose={() => setConfirmSingleOpen(false)} maxWidth="max-w-2xl">
+      <LayerModal
+        open={confirmSingleOpen}
+        layerName="Confirm Single"
+        title="Confirm Single"
+        sub="Review → Push"
+        onClose={() => setConfirmSingleOpen(false)}
+        maxWidth="max-w-2xl"
+      >
         <div style={{ borderRadius: 22, border: `1px solid ${c.surfaceBorder}`, background: c.surfaceBg, padding: 16 }}>
           {targetSingle ? (
             <div style={{ borderRadius: 18, border: `1px solid ${c.panelBorder}`, background: c.panelBg, padding: 14 }}>
@@ -472,28 +762,137 @@ export default function DikshaCalander({ role }) {
               <div style={{ fontSize: 12, color: c.t2, marginTop: 4 }}>{targetSingle.address || "—"}</div>
               <div style={{ fontSize: 11, color: c.t3, marginTop: 4 }}>Gender: {targetSingle.gender}</div>
             </div>
-          ) : (<div style={{ color: c.t3 }}>No customer selected.</div>)}
+          ) : (
+            <div style={{ color: c.t3 }}>No customer selected.</div>
+          )}
           <div className="flex gap-2" style={{ marginTop: 16 }}>
-            <button type="button" onClick={() => setConfirmSingleOpen(false)} style={{ flex: 1, padding: "12px 16px", borderRadius: 18, background: c.btnGhostBg, color: c.btnGhostText, border: `1px solid ${c.btnGhostBorder}`, cursor: "pointer" }}>Back</button>
-            <button type="button" onClick={confirmSinglePush} disabled={pushing || !targetSingle} style={{ flex: 1, padding: "12px 16px", borderRadius: 18, background: c.btnSolidBg, color: c.btnSolidText, fontWeight: 600, border: "none", cursor: pushing || !targetSingle ? "not-allowed" : "pointer", opacity: pushing || !targetSingle ? 0.6 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              {pushing ? <BufferSpinner size={16} /> : null}{pushing ? "Pushing..." : "Push Single"}
+            <button
+              type="button"
+              onClick={() => setConfirmSingleOpen(false)}
+              style={{
+                flex: 1,
+                padding: "12px 16px",
+                borderRadius: 18,
+                background: c.btnGhostBg,
+                color: c.btnGhostText,
+                border: `1px solid ${c.btnGhostBorder}`,
+                cursor: "pointer",
+              }}
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={confirmSinglePush}
+              disabled={pushing || !targetSingle}
+              style={{
+                flex: 1,
+                padding: "12px 16px",
+                borderRadius: 18,
+                background: c.btnSolidBg,
+                color: c.btnSolidText,
+                fontWeight: 600,
+                border: "none",
+                cursor: pushing || !targetSingle ? "not-allowed" : "pointer",
+                opacity: pushing || !targetSingle ? 0.6 : 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+              }}
+            >
+              {pushing ? <BufferSpinner size={16} /> : null}
+              {pushing ? "Pushing..." : "Push Single"}
             </button>
           </div>
         </div>
       </LayerModal>
 
       {/* Confirm Family */}
-      <LayerModal open={confirmFamilyOpen} layerName="Confirm Family" title={selectedIds.length === 2 ? "Confirm Couple" : "Confirm Family"} sub="Review → Push" onClose={() => setConfirmFamilyOpen(false)} maxWidth="max-w-4xl">
+      <LayerModal
+        open={confirmFamilyOpen}
+        layerName="Confirm Family"
+        title={selectedIds.length === 2 ? "Confirm Couple" : "Confirm Family"}
+        sub="Review → Push"
+        onClose={() => setConfirmFamilyOpen(false)}
+        maxWidth="max-w-4xl"
+      >
         <div className="flex gap-2" style={{ marginTop: 16 }}>
-          <button type="button" onClick={() => setConfirmFamilyOpen(false)} style={{ flex: 1, padding: "12px 16px", borderRadius: 18, background: c.btnGhostBg, color: c.btnGhostText, border: `1px solid ${c.btnGhostBorder}`, cursor: "pointer" }}>Back</button>
-          <button type="button" onClick={confirmFamilyPush} disabled={pushing || selectedIds.length < 2} style={{ flex: 1, padding: "12px 16px", borderRadius: 18, background: c.btnSolidBg, color: c.btnSolidText, fontWeight: 600, border: "none", cursor: pushing || selectedIds.length < 2 ? "not-allowed" : "pointer", opacity: pushing || selectedIds.length < 2 ? 0.6 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-            {pushing ? <BufferSpinner size={16} /> : null}{pushing ? "Pushing..." : selectedIds.length === 2 ? "Push Couple" : "Push Family"}
+          <button
+            type="button"
+            onClick={() => setConfirmFamilyOpen(false)}
+            style={{
+              flex: 1,
+              padding: "12px 16px",
+              borderRadius: 18,
+              background: c.btnGhostBg,
+              color: c.btnGhostText,
+              border: `1px solid ${c.btnGhostBorder}`,
+              cursor: "pointer",
+            }}
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            onClick={confirmFamilyPush}
+            disabled={pushing || selectedIds.length < 2}
+            style={{
+              flex: 1,
+              padding: "12px 16px",
+              borderRadius: 18,
+              background: c.btnSolidBg,
+              color: c.btnSolidText,
+              fontWeight: 600,
+              border: "none",
+              cursor: pushing || selectedIds.length < 2 ? "not-allowed" : "pointer",
+              opacity: pushing || selectedIds.length < 2 ? 0.6 : 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+            }}
+          >
+            {pushing ? <BufferSpinner size={16} /> : null}
+            {pushing ? "Pushing..." : selectedIds.length === 2 ? "Push Couple" : "Push Family"}
           </button>
         </div>
       </LayerModal>
 
+      {/* Change Date Modal */}
+      <ChangeDateModal
+        open={changeDateOpen}
+        onClose={() => {
+          setChangeDateOpen(false);
+          setChangeDateAssignment(null);
+          setChangeDateGroupMembers([]);
+        }}
+        mode={MODE}
+        container={container}
+        assignment={changeDateAssignment}
+        groupMembers={changeDateGroupMembers}
+        pushing={pushing}
+        onExecuteMove={executeChangeDate}
+        onShowWarn={showWarn}
+        requestCommit={requestCommit}
+      />
+
       {/* Profile */}
-      <CustomerProfileModal open={profileOpen} onClose={() => { setProfileOpen(false); setProfileCustomer(null); setProfileSeqNo(null); }} customer={profileCustomer} source="SITTING" sequenceNo={profileSeqNo} onChanged={async () => { await refreshContainer(); await loadSummary(); }} />
+      <CustomerProfileModal
+        open={profileOpen}
+        onClose={() => {
+          setProfileOpen(false);
+          setProfileCustomer(null);
+          setProfileSeqNo(null);
+        }}
+        customer={profileCustomer}
+        source="SITTING"
+        sequenceNo={profileSeqNo}
+        onChanged={async () => {
+          await refreshContainer();
+          await loadSummary();
+        }}
+      />
 
       {CommitModal}
     </div>

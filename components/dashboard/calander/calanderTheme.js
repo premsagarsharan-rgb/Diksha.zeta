@@ -559,6 +559,231 @@ export const CT = {
     dayLockedBg: "rgba(220,38,38,0.05)",
     dayLockedBorder: "rgba(220,38,38,0.10)",
     dayLockedDot: "#dc2626",
+// ═══════════════════════════════════════
+// ADD these tokens in CT.dark (after dayLockedDot)
+// ═══════════════════════════════════════
+
+    // ─── CHANGE DATE / MOVE ───
+    moveBtnBg: "rgba(99,102,241,0.12)",
+    moveBtnBorder: "rgba(129,140,248,0.25)",
+    moveBtnText: "#818cf8",
+    moveBtnHover: "rgba(99,102,241,0.20)",
+
+    moveModalBg: "rgba(12,12,28,0.95)",
+    moveModalBorder: "rgba(255,255,255,0.08)",
+
+    moveOptionBg: "rgba(255,255,255,0.04)",
+    moveOptionBorder: "rgba(255,255,255,0.08)",
+    moveOptionHover: "rgba(255,255,255,0.08)",
+    moveOptionText: "rgba(255,255,255,0.85)",
+    moveOptionSub: "rgba(255,255,255,0.45)",
+    moveOptionActiveBg: "rgba(99,102,241,0.12)",
+    moveOptionActiveBorder: "rgba(129,140,248,0.30)",
+
+    // Picker capacity tiers
+    pickOkBg: "rgba(16,185,129,0.10)",
+    pickOkBorder: "rgba(52,211,153,0.20)",
+    pickOkText: "#34d399",
+    pickOkDot: "#10b981",
+
+    pickMidBg: "rgba(245,158,11,0.10)",
+    pickMidBorder: "rgba(251,191,36,0.20)",
+    pickMidText: "#fbbf24",
+    pickMidDot: "#f59e0b",
+
+    pickHighBg: "rgba(239,68,68,0.10)",
+    pickHighBorder: "rgba(248,113,113,0.20)",
+    pickHighText: "#f87171",
+    pickHighDot: "#ef4444",
+
+    pickFullBg: "rgba(0,0,0,0.40)",
+    pickFullBorder: "rgba(255,255,255,0.06)",
+    pickFullText: "rgba(255,255,255,0.25)",
+    pickFullDot: "rgba(255,255,255,0.15)",
+
+    pickBlockedBg: "rgba(239,68,68,0.06)",
+    pickBlockedBorder: "rgba(248,113,113,0.10)",
+    pickBlockedText: "rgba(248,113,113,0.35)",
+    pickBlockedIcon: "rgba(248,113,113,0.50)",
+
+    pickCurrentBg: "rgba(99,102,241,0.15)",
+    pickCurrentBorder: "rgba(129,140,248,0.40)",
+    pickCurrentText: "#a5b4fc",
+    pickCurrentDot: "#818cf8",
+
+    pickBoundaryBg: "rgba(239,68,68,0.08)",
+    pickBoundaryBorder: "rgba(248,113,113,0.25)",
+    pickBoundaryText: "#fca5a5",
+    pickBoundaryIcon: "#f87171",
+
+    // Move preview
+    previewFromBg: "rgba(239,68,68,0.08)",
+    previewFromBorder: "rgba(248,113,113,0.18)",
+    previewFromText: "#fca5a5",
+    previewToBg: "rgba(16,185,129,0.08)",
+    previewToBorder: "rgba(52,211,153,0.18)",
+    previewToText: "#6ee7b7",
+    previewArrow: "rgba(255,255,255,0.30)",
+
+    previewImpactOk: "#34d399",
+    previewImpactWarn: "#fbbf24",
+    previewImpactDanger: "#f87171",
+
+    previewMemberBg: "rgba(255,255,255,0.04)",
+    previewMemberBorder: "rgba(255,255,255,0.08)",
+
+    previewWarnBg: "rgba(245,158,11,0.08)",
+    previewWarnBorder: "rgba(251,191,36,0.18)",
+    previewWarnText: "#fcd34d",
+
+    // Move reason
+    reasonBg: "rgba(255,255,255,0.04)",
+    reasonBorder: "rgba(255,255,255,0.08)",
+    reasonText: "rgba(255,255,255,0.70)",
+    reasonActiveBg: "rgba(99,102,241,0.10)",
+    reasonActiveBorder: "rgba(129,140,248,0.25)",
+    reasonActiveText: "#a5b4fc",
+
+    // Moved badge (on card)
+    movedBadgeBg: "rgba(99,102,241,0.10)",
+    movedBadgeBorder: "rgba(129,140,248,0.20)",
+    movedBadgeText: "#a5b4fc",
+
+    // Cooldown
+    cooldownBg: "rgba(245,158,11,0.08)",
+    cooldownBorder: "rgba(251,191,36,0.18)",
+    cooldownText: "#fcd34d",
+    cooldownTimerText: "#fbbf24",
+
+    // Detach warning
+    detachWarnBg: "rgba(236,72,153,0.08)",
+    detachWarnBorder: "rgba(244,114,182,0.18)",
+    detachWarnText: "#f9a8d4",
+    detachWarnAccent: "#ec4899",
+
+    // Group selector
+    groupSelectBg: "rgba(255,255,255,0.04)",
+    groupSelectBorder: "rgba(255,255,255,0.08)",
+    groupSelectActiveBg: "rgba(99,102,241,0.12)",
+    groupSelectActiveBorder: "rgba(129,140,248,0.25)",
+    groupSelectText: "rgba(255,255,255,0.70)",
+    groupSelectActiveText: "#a5b4fc",
+    groupCheckOn: "#818cf8",
+    groupCheckOff: "rgba(255,255,255,0.15)",
+
+
+// ═══════════════════════════════════════
+// ADD these tokens in CT.light (after dayLockedDot)
+// ═══════════════════════════════════════
+
+    // ─── CHANGE DATE / MOVE ───
+    moveBtnBg: "rgba(37,99,235,0.06)",
+    moveBtnBorder: "rgba(37,99,235,0.15)",
+    moveBtnText: "#2563eb",
+    moveBtnHover: "rgba(37,99,235,0.10)",
+
+    moveModalBg: "rgba(255,255,255,0.97)",
+    moveModalBorder: "rgba(0,0,0,0.08)",
+
+    moveOptionBg: "rgba(0,0,0,0.02)",
+    moveOptionBorder: "rgba(0,0,0,0.06)",
+    moveOptionHover: "rgba(0,0,0,0.04)",
+    moveOptionText: "#0f172a",
+    moveOptionSub: "rgba(15,23,42,0.50)",
+    moveOptionActiveBg: "rgba(37,99,235,0.06)",
+    moveOptionActiveBorder: "rgba(37,99,235,0.18)",
+
+    // Picker capacity tiers
+    pickOkBg: "rgba(22,163,74,0.06)",
+    pickOkBorder: "rgba(22,163,74,0.12)",
+    pickOkText: "#15803d",
+    pickOkDot: "#16a34a",
+
+    pickMidBg: "rgba(202,138,4,0.06)",
+    pickMidBorder: "rgba(202,138,4,0.12)",
+    pickMidText: "#92400e",
+    pickMidDot: "#ca8a04",
+
+    pickHighBg: "rgba(220,38,38,0.06)",
+    pickHighBorder: "rgba(220,38,38,0.12)",
+    pickHighText: "#991b1b",
+    pickHighDot: "#dc2626",
+
+    pickFullBg: "rgba(0,0,0,0.04)",
+    pickFullBorder: "rgba(0,0,0,0.08)",
+    pickFullText: "rgba(15,23,42,0.25)",
+    pickFullDot: "rgba(15,23,42,0.15)",
+
+    pickBlockedBg: "rgba(220,38,38,0.04)",
+    pickBlockedBorder: "rgba(220,38,38,0.08)",
+    pickBlockedText: "rgba(220,38,38,0.30)",
+    pickBlockedIcon: "rgba(220,38,38,0.45)",
+
+    pickCurrentBg: "rgba(37,99,235,0.08)",
+    pickCurrentBorder: "rgba(37,99,235,0.25)",
+    pickCurrentText: "#1d4ed8",
+    pickCurrentDot: "#2563eb",
+
+    pickBoundaryBg: "rgba(220,38,38,0.06)",
+    pickBoundaryBorder: "rgba(220,38,38,0.18)",
+    pickBoundaryText: "#991b1b",
+    pickBoundaryIcon: "#dc2626",
+
+    // Move preview
+    previewFromBg: "rgba(220,38,38,0.05)",
+    previewFromBorder: "rgba(220,38,38,0.12)",
+    previewFromText: "#991b1b",
+    previewToBg: "rgba(22,163,74,0.05)",
+    previewToBorder: "rgba(22,163,74,0.12)",
+    previewToText: "#15803d",
+    previewArrow: "rgba(15,23,42,0.25)",
+
+    previewImpactOk: "#16a34a",
+    previewImpactWarn: "#ca8a04",
+    previewImpactDanger: "#dc2626",
+
+    previewMemberBg: "rgba(0,0,0,0.02)",
+    previewMemberBorder: "rgba(0,0,0,0.06)",
+
+    previewWarnBg: "rgba(202,138,4,0.05)",
+    previewWarnBorder: "rgba(202,138,4,0.12)",
+    previewWarnText: "#92400e",
+
+    // Move reason
+    reasonBg: "rgba(0,0,0,0.02)",
+    reasonBorder: "rgba(0,0,0,0.06)",
+    reasonText: "rgba(15,23,42,0.60)",
+    reasonActiveBg: "rgba(37,99,235,0.06)",
+    reasonActiveBorder: "rgba(37,99,235,0.15)",
+    reasonActiveText: "#1d4ed8",
+
+    // Moved badge (on card)
+    movedBadgeBg: "rgba(37,99,235,0.06)",
+    movedBadgeBorder: "rgba(37,99,235,0.12)",
+    movedBadgeText: "#1d4ed8",
+
+    // Cooldown
+    cooldownBg: "rgba(202,138,4,0.05)",
+    cooldownBorder: "rgba(202,138,4,0.12)",
+    cooldownText: "#92400e",
+    cooldownTimerText: "#b45309",
+
+    // Detach warning
+    detachWarnBg: "rgba(219,39,119,0.05)",
+    detachWarnBorder: "rgba(219,39,119,0.12)",
+    detachWarnText: "#be185d",
+    detachWarnAccent: "#db2777",
+
+    // Group selector
+    groupSelectBg: "rgba(0,0,0,0.02)",
+    groupSelectBorder: "rgba(0,0,0,0.06)",
+    groupSelectActiveBg: "rgba(37,99,235,0.06)",
+    groupSelectActiveBorder: "rgba(37,99,235,0.15)",
+    groupSelectText: "rgba(15,23,42,0.60)",
+    groupSelectActiveText: "#1d4ed8",
+    groupCheckOn: "#2563eb",
+    groupCheckOff: "rgba(15,23,42,0.15)",
+
   },
 };
 

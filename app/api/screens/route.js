@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
-import { getSession } from "@/lib/session";
+import { getSession } from "@/lib/session.server";
 import crypto from "crypto";
 
 export const runtime = "nodejs";

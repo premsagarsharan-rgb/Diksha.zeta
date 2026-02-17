@@ -1,6 +1,6 @@
 // app/dashboard/page.js
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/session";
+import { getSession } from "@/lib/session.server";
 import DashboardShell from "@/components/DashboardShell";
 import DashboardBackGuard from "@/components/DashboardBackGuard";
 import SessionGuard from "@/components/SessionGuard";

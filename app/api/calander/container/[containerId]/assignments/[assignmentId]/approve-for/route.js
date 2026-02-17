@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
-import { getSession } from "@/lib/session";
+import { getSession } from "@/lib/session.server";
 import { addCommit } from "@/lib/commits";
 
 export const runtime = "nodejs";

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
-import { getSession, clearSessionCookie } from "@/lib/session";
+import { getSession, clearSessionCookie } from "@/lib/session.server";
 
 export const runtime = "nodejs";
 
