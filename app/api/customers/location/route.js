@@ -6,71 +6,81 @@ export const runtime = "nodejs";
 
 export async function GET() {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // ★ FIX: session.username — tumhare session structure ke hisaab se
+  const currentUser = session.username || "";
 
   const db = await getDb();
 
-  // 1) SITTING customers -> find latest IN_CONTAINER assignment -> find container (MEETING/DIKSHA)
-  const sittingItems = await db.collection("sittingCustomers").aggregate([
-    {
-      $lookup: {
-        from: "calendarAssignments",
-        let: { cid: "$_id" },
-        pipeline: [
-          {
-            $match: {
-              $expr: {
-                $and: [
-                  { $eq: ["$customerId", "$$cid"] },
-                  { $eq: ["$status", "IN_CONTAINER"] },
-                ],
+  // 1) SITTING customers
+  const sittingItems = await db
+    .collection("sittingCustomers")
+    .aggregate([
+      {
+        $lookup: {
+          from: "calendarAssignments",
+          let: { cid: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$customerId", "$$cid"] },
+                    { $eq: ["$status", "IN_CONTAINER"] },
+                  ],
+                },
               },
             },
-          },
-          { $sort: { createdAt: -1 } },
-          { $limit: 1 },
-          {
-            $project: {
-              containerId: 1,
-              kind: 1,
-              pairId: 1,
-              roleInPair: 1,
-              occupiedDate: 1,
-              occupiedContainerId: 1,
-              meetingDecision: 1,
+            { $sort: { createdAt: -1 } },
+            { $limit: 1 },
+            {
+              $project: {
+                containerId: 1,
+                kind: 1,
+                pairId: 1,
+                roleInPair: 1,
+                occupiedDate: 1,
+                occupiedContainerId: 1,
+                meetingDecision: 1,
+              },
             },
-          },
-        ],
-        as: "asg",
+          ],
+          as: "asg",
+        },
       },
-    },
-    { $unwind: { path: "$asg", preserveNullAndEmptyArrays: true } },
-    {
-      $lookup: {
-        from: "calendarContainers",
-        localField: "asg.containerId",
-        foreignField: "_id",
-        as: "ctn",
+      { $unwind: { path: "$asg", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "calendarContainers",
+          localField: "asg.containerId",
+          foreignField: "_id",
+          as: "ctn",
+        },
       },
-    },
-    { $unwind: { path: "$ctn", preserveNullAndEmptyArrays: true } },
-    {
-      $project: {
-        _id: 1,
-        name: 1,
-        rollNo: 1,
-        gender: 1,
-        sittingStatus: "$status",
+      { $unwind: { path: "$ctn", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          rollNo: 1,
+          gender: 1,
+          phone: 1,
+          remarksBy: 1,
+          remarks: 1,
+          sittingStatus: "$status",
 
-        containerId: "$ctn._id",
-        mode: "$ctn.mode",
-        date: "$ctn.date",
+          containerId: "$ctn._id",
+          mode: "$ctn.mode",
+          date: "$ctn.date",
 
-        occupiedDate: "$asg.occupiedDate",
-        meetingDecision: "$asg.meetingDecision",
+          occupiedDate: "$asg.occupiedDate",
+          meetingDecision: "$asg.meetingDecision",
+        },
       },
-    },
-  ]).toArray();
+    ])
+    .toArray();
 
   const sittingNormalized = sittingItems.map((x) => {
     const hasContainer = Boolean(x.containerId && x.mode && x.date);
@@ -83,6 +93,9 @@ export async function GET() {
       name: x.name || "",
       rollNo: x.rollNo || "",
       gender: x.gender || "",
+      phone: x.phone || "",
+      remarksBy: x.remarksBy || "",
+      remarks: x.remarks || "",
       sittingStatus: x.sittingStatus || "",
 
       locationType,
@@ -98,34 +111,40 @@ export async function GET() {
     };
   });
 
-  // 2) PENDING customers (these are not in container; show last known container if available)
-  const pendingItems = await db.collection("pendingCustomers").aggregate([
-    {
-      $lookup: {
-        from: "calendarContainers",
-        localField: "pausedFromContainerId",
-        foreignField: "_id",
-        as: "ctn",
+  // 2) PENDING customers
+  const pendingItems = await db
+    .collection("pendingCustomers")
+    .aggregate([
+      {
+        $lookup: {
+          from: "calendarContainers",
+          localField: "pausedFromContainerId",
+          foreignField: "_id",
+          as: "ctn",
+        },
       },
-    },
-    { $unwind: { path: "$ctn", preserveNullAndEmptyArrays: true } },
-    {
-      $project: {
-        _id: 1,
-        name: 1,
-        rollNo: 1,
-        gender: 1,
-        status: 1,
-        pausedAt: 1,
-        pausedFromContainerId: 1,
+      { $unwind: { path: "$ctn", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          rollNo: 1,
+          gender: 1,
+          phone: 1,
+          remarksBy: 1,
+          remarks: 1,
+          status: 1,
+          pausedAt: 1,
+          pausedFromContainerId: 1,
 
-        lastContainerId: "$ctn._id",
-        lastMode: "$ctn.mode",
-        lastDate: "$ctn.date",
+          lastContainerId: "$ctn._id",
+          lastMode: "$ctn.mode",
+          lastDate: "$ctn.date",
+        },
       },
-    },
-    { $sort: { pausedAt: -1 } },
-  ]).toArray();
+      { $sort: { pausedAt: -1 } },
+    ])
+    .toArray();
 
   const pendingNormalized = pendingItems.map((x) => {
     return {
@@ -135,13 +154,19 @@ export async function GET() {
       name: x.name || "",
       rollNo: x.rollNo || "",
       gender: x.gender || "",
+      phone: x.phone || "",
+      remarksBy: x.remarksBy || "",
+      remarks: x.remarks || "",
       sittingStatus: "",
 
       locationType: "PENDING",
       locationLabel: "PENDING",
 
-      // last known container (optional)
-      containerId: x.lastContainerId ? String(x.lastContainerId) : (x.pausedFromContainerId ? String(x.pausedFromContainerId) : null),
+      containerId: x.lastContainerId
+        ? String(x.lastContainerId)
+        : x.pausedFromContainerId
+          ? String(x.pausedFromContainerId)
+          : null,
       mode: x.lastMode || null,
       date: x.lastDate || null,
 
@@ -151,8 +176,11 @@ export async function GET() {
     };
   });
 
-  // merge (pending + sitting)
+  // 3) Merge + return with username
   const items = [...pendingNormalized, ...sittingNormalized];
 
-  return NextResponse.json({ items });
+  return NextResponse.json({
+    items,
+    currentUser,
+  });
 }

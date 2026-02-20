@@ -1,13 +1,15 @@
 // app/api/customers/pending/[id]/restore/route.js
+// ✅ MODIFIED — Activity tracking for restore from pending
+
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { getSession } from "@/lib/session.server";
 import { addCommit } from "@/lib/commits";
+import { logActivity, extractRequestInfo } from "@/lib/activityLogger";
 
 export const runtime = "nodejs";
 
-// IST date key: "YYYY-MM-DD"
 function getISTDateKey(d = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
@@ -23,17 +25,12 @@ function getISTDateKey(d = new Date()) {
 }
 
 async function ensureTodayIndexes(db) {
-  // submissionId dedupe (double-click protection)
   try {
     await db.collection("todayCustomers").createIndex({ submissionId: 1 }, { unique: true });
   } catch {}
-
-  // roll number unique per day
   try {
     await db.collection("todayCustomers").createIndex({ rollDate: 1, rollNo: 1 }, { unique: true });
   } catch {}
-
-  // counter unique per day
   try {
     await db.collection("dailyRollCounters").createIndex({ rollDate: 1 }, { unique: true });
   } catch {}
@@ -54,7 +51,7 @@ async function allocateDailyRollNo(db, rollDate) {
   const seq = doc?.seq;
 
   if (!Number.isInteger(seq)) return null;
-  if (seq > 500) return "ROLL_LIMIT_REACHED"; // daily limit same as your earlier pool (optional)
+  if (seq > 500) return "ROLL_LIMIT_REACHED";
   return seq;
 }
 
@@ -62,6 +59,7 @@ export async function POST(req, { params }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const reqInfo = extractRequestInfo(req);
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const commitMessage = body?.commitMessage;
@@ -78,10 +76,28 @@ export async function POST(req, { params }) {
 
   const submissionId = pending.submissionId || `legacy_${String(_id)}`;
 
-  // ✅ If already restored (by id or submissionId), just cleanup pending + return ok
+  // Dedupe checks
   const alreadyById = await db.collection("todayCustomers").findOne({ _id });
   if (alreadyById) {
     await db.collection("pendingCustomers").deleteOne({ _id });
+
+    // ═══════ LOG RESTORE DEDUPE ═══════
+    logActivity({
+      userId: session.userId,
+      username: session.username,
+      action: "customer_restore_dedupe",
+      category: "CRUD",
+      description: `Restore deduped — "${pending.name}" already in Recent`,
+      meta: {
+        customerId: String(_id),
+        name: pending.name,
+        rollNo: alreadyById.rollNo,
+      },
+      ip: reqInfo.ip,
+      device: reqInfo.device,
+      severity: "info",
+    });
+
     return NextResponse.json({
       ok: true,
       deduped: true,
@@ -105,7 +121,6 @@ export async function POST(req, { params }) {
 
   const rollDate = getISTDateKey();
 
-  // Try insert with roll allocation (retry on rare rollNo collision)
   let lastErr = null;
   for (let attempt = 0; attempt < 5; attempt++) {
     const rollNo = await allocateDailyRollNo(db, rollDate);
@@ -120,26 +135,17 @@ export async function POST(req, { params }) {
       ...pending,
       _id,
       submissionId,
-
-      // ✅ override to match new daily system
       rollDate,
       rollNo,
-
       status: "RECENT",
-
-      // keep history (additive)
       originalCreatedAt,
-      createdAt: new Date(), // so restored item comes to top in Recent
+      createdAt: new Date(),
       restoredAt: new Date(),
       restoredByUserId: session.userId,
     };
 
-    // Important: remove fields that belong to pending state if you store any (optional)
-    // (we are NOT deleting unknown fields; only overriding the required ones)
-
     try {
       await db.collection("todayCustomers").insertOne(doc);
-
       await db.collection("pendingCustomers").deleteOne({ _id });
 
       const actorLabel = `${session.role}:${session.username}`;
@@ -153,18 +159,54 @@ export async function POST(req, { params }) {
         meta: { rollNo, rollDate },
       });
 
+      // ═══════ LOG CUSTOMER RESTORED ═══════
+      logActivity({
+        userId: session.userId,
+        username: session.username,
+        action: "customer_restore",
+        category: "CRUD",
+        description: `Restored "${pending.name}" from Pending → Recent — Roll: ${rollNo}`,
+        meta: {
+          customerId: String(_id),
+          name: pending.name,
+          rollNo,
+          rollDate,
+          originalRollNo: pending.rollNo || null,
+          pendingDuration: pending.movedAt
+            ? Math.floor((Date.now() - new Date(pending.movedAt).getTime()) / 1000)
+            : null,
+          commitMessage,
+        },
+        ip: reqInfo.ip,
+        device: reqInfo.device,
+        severity: "info",
+      });
+
       return NextResponse.json({ ok: true, id: String(_id), rollNo, rollDate });
     } catch (e) {
       lastErr = e;
-      if (String(e?.code) === "11000") {
-        // Duplicate (submissionId/rollNo/_id). If rollNo collided, retry.
-        continue;
-      }
+      if (String(e?.code) === "11000") continue;
       return NextResponse.json({ error: "Restore failed" }, { status: 500 });
     }
   }
 
-  // If still failing after retries
+  // ═══════ LOG RESTORE FAILED ═══════
+  logActivity({
+    userId: session.userId,
+    username: session.username,
+    action: "customer_restore_failed",
+    category: "SECURITY",
+    description: `Failed to restore "${pending.name}" after 5 attempts`,
+    meta: {
+      customerId: String(_id),
+      name: pending.name,
+      error: lastErr?.message,
+    },
+    ip: reqInfo.ip,
+    device: reqInfo.device,
+    severity: "critical",
+  });
+
   if (String(lastErr?.code) === "11000") {
     return NextResponse.json({ error: "DUPLICATE (restore collision)" }, { status: 409 });
   }

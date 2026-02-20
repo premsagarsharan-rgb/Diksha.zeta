@@ -1,7 +1,7 @@
 // components/dashboard/calander/AssignmentCard.js
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useCT, getCardStyle } from "./calanderTheme";
 import { useTheme } from "@/components/ThemeProvider";
 
@@ -11,6 +11,7 @@ export default function AssignmentCard({
   containerMode,
   pushing,
   locked,
+  priorityGroup,
   onOpenProfile,
   onConfirm,
   onReject,
@@ -38,36 +39,7 @@ export default function AssignmentCard({
   // ── Moved badge ──
   const moveCount = assignment?.moveCount || 0;
   const hasMoved = moveCount > 0;
-  const lastMovedAt = assignment?.lastMovedAt;
   const originalDate = assignment?.moveHistory?.[0]?.fromDate || null;
-
-  // ── Cooldown timer ──
-  const [cooldownSec, setCooldownSec] = useState(0);
-
-  useEffect(() => {
-    if (!lastMovedAt) { setCooldownSec(0); return; }
-
-    function calcRemaining() {
-      const moved = new Date(lastMovedAt).getTime();
-      const now = Date.now();
-      // Default 5 min cooldown visual (server enforces actual)
-      const cooldownMs = 5 * 60 * 1000;
-      const remaining = Math.max(0, Math.ceil((moved + cooldownMs - now) / 1000));
-      return remaining;
-    }
-
-    setCooldownSec(calcRemaining());
-
-    const timer = setInterval(() => {
-      const rem = calcRemaining();
-      setCooldownSec(rem);
-      if (rem <= 0) clearInterval(timer);
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [lastMovedAt]);
-
-  const inCooldown = cooldownSec > 0;
 
   const handleLockedClick = useCallback((actionName) => {
     if (locked) {
@@ -87,20 +59,16 @@ export default function AssignmentCard({
       onShowWarn?.("👑 QUALIFIED", "Card is QUALIFIED (locked forever). Cannot change date.");
       return;
     }
-    if (inCooldown) {
-      const mins = Math.floor(cooldownSec / 60);
-      const secs = cooldownSec % 60;
-      onShowWarn?.("⏰ Cooldown Active", `Please wait ${mins}m ${secs}s before moving this card again.`);
-      return;
-    }
     onChangeDate?.(assignment, seq);
   }
 
-  function formatCooldown(sec) {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m}:${String(s).padStart(2, "0")}`;
-  }
+  // Priority badge config
+  const priorityConfig = {
+    COUPLE: { icon: "💑", label: "COUPLE", bg: c.coupleBadgeBg || "rgba(168,85,247,0.12)", border: c.coupleBadgeBorder || "rgba(168,85,247,0.25)", text: c.coupleBadgeText || "rgb(168,85,247)" },
+    SINGLE_FEMALE: { icon: "👩", label: "S·FEMALE", bg: c.femaleBg, border: c.femaleBorder, text: c.femaleText },
+    SINGLE_MALE: { icon: "👨", label: "S·MALE", bg: c.maleBg, border: c.maleBorder, text: c.maleText },
+  };
+  const pBadge = priorityConfig[priorityGroup] || null;
 
   return (
     <div
@@ -189,6 +157,19 @@ export default function AssignmentCard({
 
         {/* Badges row */}
         <div className="flex flex-wrap gap-1" style={{ marginTop: 8, marginLeft: 34 }}>
+          {/* Priority Group Badge */}
+          {pBadge && (
+            <span
+              style={{
+                fontSize: 9, padding: "2px 7px", borderRadius: 999,
+                background: pBadge.bg, border: `1px solid ${pBadge.border}`,
+                color: pBadge.text, fontWeight: 700,
+              }}
+            >
+              {pBadge.icon} {pBadge.label}
+            </span>
+          )}
+
           {/* Gender */}
           <span
             style={{
@@ -273,76 +254,46 @@ export default function AssignmentCard({
               🔄 {moveCount}x
             </span>
           )}
-
-          {/* ── COOLDOWN timer ── */}
-          {inCooldown && (
-            <span
-              style={{
-                fontSize: 9, padding: "2px 7px", borderRadius: 999,
-                background: c.cooldownBg, border: `1px solid ${c.cooldownBorder}`,
-                color: c.cooldownTimerText, fontWeight: 700,
-                fontVariantNumeric: "tabular-nums",
-              }}
-            >
-              ⏰ {formatCooldown(cooldownSec)}
-            </span>
-          )}
         </div>
       </div>
 
       {/* Right Action Buttons */}
       <div className="flex flex-col gap-1.5" style={{ flexShrink: 0 }}>
 
-        {/* ── 📅 CHANGE DATE BUTTON (NEW!) ── */}
+        {/* ── 📅 CHANGE DATE BUTTON ── */}
         <button
-          disabled={actionsDisabled || qualified || inCooldown}
+          disabled={actionsDisabled || qualified}
           onClick={handleChangeDateClick}
           title={
             locked
               ? "🔒 Container locked"
               : qualified
               ? "👑 QUALIFIED — cannot move"
-              : inCooldown
-              ? `⏰ Cooldown: ${formatCooldown(cooldownSec)}`
               : "📅 Change Date"
           }
           style={{
             padding: "6px 14px",
             borderRadius: 14,
-            background: locked
-              ? c.lockOverlay
-              : inCooldown
-              ? c.cooldownBg
-              : c.moveBtnBg,
-            color: locked
-              ? c.lockBadgeText
-              : inCooldown
-              ? c.cooldownText
-              : c.moveBtnText,
+            background: locked ? c.lockOverlay : c.moveBtnBg,
+            color: locked ? c.lockBadgeText : c.moveBtnText,
             fontSize: 11,
             fontWeight: 600,
-            border: `1px solid ${
-              locked
-                ? c.lockBadgeBorder
-                : inCooldown
-                ? c.cooldownBorder
-                : c.moveBtnBorder
-            }`,
-            cursor: actionsDisabled || qualified || inCooldown ? "not-allowed" : "pointer",
-            opacity: actionsDisabled || qualified || inCooldown ? c.lockDisabledOpacity : 1,
+            border: `1px solid ${locked ? c.lockBadgeBorder : c.moveBtnBorder}`,
+            cursor: actionsDisabled || qualified ? "not-allowed" : "pointer",
+            opacity: actionsDisabled || qualified ? c.lockDisabledOpacity : 1,
             transition: "transform 0.1s, opacity 0.15s",
             display: "flex",
             alignItems: "center",
             gap: 4,
           }}
           onPointerDown={(e) => {
-            if (!actionsDisabled && !qualified && !inCooldown)
+            if (!actionsDisabled && !qualified)
               e.currentTarget.style.transform = "scale(0.95)";
           }}
           onPointerUp={(e) => (e.currentTarget.style.transform = "")}
         >
           {locked && <span style={{ fontSize: 10 }}>🔒</span>}
-          {inCooldown ? `⏰ ${formatCooldown(cooldownSec)}` : "📅 Move"}
+          📅 Move
         </button>
 
         {isMeeting ? (

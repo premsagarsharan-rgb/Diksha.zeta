@@ -1,56 +1,35 @@
 // app/api/trash/route.js
-import { NextResponse } from "next/server";
-import { getDb } from "@/lib/mongodb";
 import { getSession } from "@/lib/session.server";
+import { getDb } from "@/lib/mongodb";
+import { rateLimit, getIP } from "@/lib/rateLimit";
+import * as api from "@/lib/apiResponse";
 
-export const runtime = "nodejs";
+export async function GET(req) {
+  try {
+    // Auth check
+    const session = await getSession();
+    if (!session) return api.unauthorized();
 
-export async function GET() {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Rate limit
+    const ip = getIP(req);
+    const rl = rateLimit(`trash:get:${session.userId}:${ip}`, {
+      limit: 30,
+      windowMs: 60000,
+    });
+    if (!rl.success) return api.rateLimited(rl.resetIn);
 
-  const db = await getDb();
+    const db = await getDb();
 
-  const items = await db
-    .collection("calendarAssignments")
-    .aggregate([
-      {
-        $match: {
-          status: "REJECTED",
-          cardStatus: "REJECTED",
-        },
-      },
-      { $sort: { trashedAt: -1, rejectedAt: -1 } },
-      {
-        $lookup: {
-          from: "sittingCustomers",
-          localField: "customerId",
-          foreignField: "_id",
-          as: "customerData",
-        },
-      },
-      {
-        $lookup: {
-          from: "calendarContainers",
-          localField: "containerId",
-          foreignField: "_id",
-          as: "containerData",
-        },
-      },
-      {
-        $addFields: {
-          customer: { $arrayElemAt: ["$customerData", 0] },
-          container: { $arrayElemAt: ["$containerData", 0] },
-        },
-      },
-      {
-        $project: {
-          customerData: 0,
-          containerData: 0,
-        },
-      },
-    ])
-    .toArray();
+    const items = await db
+      .collection("trash")
+      .find({})
+      .sort({ trashedAt: -1 })
+      .limit(500)
+      .toArray();
 
-  return NextResponse.json({ ok: true, items, count: items.length });
+    return api.success({ items, count: items.length });
+  } catch (e) {
+    console.error("[API] GET /api/trash error:", e);
+    return api.error("Failed to load trash");
+  }
 }

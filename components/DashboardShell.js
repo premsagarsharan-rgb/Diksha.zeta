@@ -16,11 +16,15 @@ import UserCreate from "@/components/dashboard/UserCreate";
 import UserManage from "@/components/dashboard/UserManage";
 import CustomerLocationTracker from "@/components/dashboard/CustomerLocationTracker";
 import Trash from "@/components/dashboard/Trash";
-import ScreensCreate from "@/components/dashboard/ScreenCreate";
-import ScreensViewer from "@/components/dashboard/ScreenViewer";
-
-// ✅ NEW: Today Meeting container summary card
 import MeetingTodayContainerWidget from "@/components/dashboard/MeetingTodayContainerWidget";
+
+// ✅ NEW: Activity Dashboard
+import ActivityDashboard from "@/components/dashboard/ActivityDashboard";
+
+// ✅ NEW: Activity Tracking Hooks
+import { usePageTracker } from "@/components/dashboard/hooks/usePageTracker";
+import { useIdleDetector } from "@/components/dashboard/hooks/useIdleDetector";
+import { useClickTracker } from "@/components/dashboard/hooks/useClickTracker";
 
 /* ═══════════════════════════════════════════════
    THEME — Dual Color System
@@ -157,14 +161,14 @@ const ICONS = {
   screensView: "👁️",
   usercreate: "👤",
   usermanage: "⚙️",
-  // ✅ NEW (not used in MobileNav but fine)
   meetingToday: "📌",
+  activity: "🔍", // ✅ NEW
 };
 
 const NAV_KEYS = ["recent", "add", "meeting", "pending"];
 
 /* ═══════════════════════════════════════════════
-   CalanderTile — Special tile that renders both buttons
+   CalanderTile
    ═══════════════════════════════════════════════ */
 
 function CalanderTile({ c, isLight, role, idx }) {
@@ -222,8 +226,9 @@ function CalanderTile({ c, isLight, role, idx }) {
 }
 
 /* ═══════════════════════════════════════════════
-   ✅ NEW: MeetingTodayTile — describes current date MEETING container
+   MeetingTodayTile
    ═══════════════════════════════════════════════ */
+
 function MeetingTodayTile({ c, isLight, idx }) {
   return (
     <div
@@ -239,7 +244,7 @@ function MeetingTodayTile({ c, isLight, idx }) {
       }}
     >
       <div className="relative z-[1] w-full p-3 md:p-4">
-<MeetingTodayContainerWidget embedded previewCount={6} />
+        <MeetingTodayContainerWidget embedded previewCount={6} />
         <div style={{ marginTop: 10, fontSize: 11, color: c.t3 }}>
           Tip: Open Meeting Calendar to manage / move cards.
         </div>
@@ -249,7 +254,7 @@ function MeetingTodayTile({ c, isLight, idx }) {
 }
 
 /* ═══════════════════════════════════════════════
-   Background — GPU Composited Only
+   Background
    ═══════════════════════════════════════════════ */
 
 function BgLayer({ c }) {
@@ -311,7 +316,7 @@ function BgLayer({ c }) {
 }
 
 /* ═══════════════════════════════════════════════
-   TileCard — Neumorphism + Glass + Neon Edge + Spotlight
+   TileCard
    ═══════════════════════════════════════════════ */
 
 function TileCard({ tile, onClick, c, isLight, idx }) {
@@ -603,28 +608,22 @@ export default function DashboardShell({ session }) {
     const t = [];
     if (can("recent")) t.push({ key: "recent", title: "Recent", sub: "Today DB", C: RecentCustomer });
     if (can("add")) t.push({ key: "add", title: "Add Aspirant", sub: "Manual → Recent", C: AddCustomer });
-
-    // ✅ NEW: Meeting Today summary tile (special)
     if (can("calander")) t.push({ key: "meetingToday", title: "Meeting Today", sub: "Auto Summary", special: true });
-
-    // ─── Calander tile ───
     if (can("calander")) t.push({ key: "calander", title: "Calander", sub: "Containers", special: true });
-
     if (can("pending")) t.push({ key: "pending", title: "Pending", sub: "Paused", C: Pending });
     if (can("sitting")) t.push({ key: "sitting", title: "Sitting", sub: "ACTIVE", C: SittingData });
     if (can("trash")) t.push({ key: "trash", title: "Trash", sub: "Rejected Cards", C: Trash });
     if (can("tracker")) t.push({ key: "tracker", title: "Tracker", sub: "Where is customer now?", C: CustomerLocationTracker });
-    if (can("screensCreate")) t.push({ key: "screensCreate", title: "Screens Create", sub: "Create / Manage screens", C: ScreensCreate });
-    if (can("screensView")) t.push({ key: "screensView", title: "Screens View", sub: "View by 5-char code", C: ScreensViewer });
     if (isAdmin) t.push({ key: "usercreate", title: "User Create", sub: "Create employee", C: UserCreate, isAdmin: true });
     if (isAdmin) t.push({ key: "usermanage", title: "User Manage", sub: "Permissions", C: UserManage, isAdmin: true });
+    // ✅ NEW: Activity Monitor tile (Admin only)
+    if (isAdmin) t.push({ key: "activity", title: "Activity Monitor", sub: "Track all user actions", C: ActivityDashboard, isAdmin: true });
     return t;
   }, [isAdmin, can]);
 
-  // For mobile nav, map "meeting" key to calander tile
   const mobileNavTiles = useMemo(() => {
     return tiles
-      .filter((t) => t.key !== "meetingToday") // ✅ hide summary tile from bottom nav
+      .filter((t) => t.key !== "meetingToday")
       .map((t) => {
         if (t.key === "calander") return { ...t, key: "meeting", title: "Meeting" };
         return t;
@@ -632,17 +631,56 @@ export default function DashboardShell({ session }) {
   }, [tiles]);
 
   const [openKey, setOpenKey] = useState(null);
+
+  // ✅ Activity Tracking Hooks
+  usePageTracker(openKey, session);
+  useIdleDetector(session);
+  useClickTracker(session);
+
+  // ✅ Tracked tile open
+  const trackAndOpen = useCallback((key) => {
+    setOpenKey(key);
+
+    // Log tile open event
+    fetch("/api/activity/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "tile_open",
+        category: "PAGE",
+        description: `Opened tile: ${key}`,
+        meta: { tile: key, openedAt: new Date().toISOString() },
+      }),
+      credentials: "include",
+    }).catch(() => {});
+  }, []);
+
   const active = tiles.find((t) => t.key === openKey && !t.special);
   const ActiveComp = active?.C;
   const greeting = useMemo(() => getGreeting(), []);
 
   function handleMobileNavOpen(key) {
-    if (key === "meeting") {
-      // MeetingCalander/DikshaCalander buttons are inside CalanderTile
-      return;
-    }
-    setOpenKey(key);
+    if (key === "meeting") return;
+    trackAndOpen(key); // ✅ tracked
   }
+
+  // ✅ Tracked logout
+  const handleLogout = useCallback(async () => {
+    try {
+      await fetch("/api/activity/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "logout_click",
+          category: "AUTH",
+          description: "User clicked logout button",
+        }),
+        credentials: "include",
+      });
+    } catch {}
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    window.location.href = "/login";
+  }, []);
 
   return (
     <div className="min-h-screen relative" style={{ background: c.page, color: c.t1 }}>
@@ -716,10 +754,7 @@ export default function DashboardShell({ session }) {
               style={{ borderColor: c.logoutB, color: c.logoutT, background: "transparent" }}
               onMouseEnter={(e) => { e.currentTarget.style.background = c.logoutH; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-              onClick={async () => {
-                await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-                window.location.href = "/login";
-              }}
+              onClick={handleLogout}
               type="button"
             >
               Logout
@@ -758,10 +793,7 @@ export default function DashboardShell({ session }) {
           <button
             className="w-9 h-9 rounded-full flex items-center justify-center text-base border transition-all duration-200"
             style={{ borderColor: c.b, background: c.glass, color: c.logoutT }}
-            onClick={async () => {
-              await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-              window.location.href = "/login";
-            }}
+            onClick={handleLogout}
             type="button"
           >
             🚪
@@ -798,7 +830,7 @@ export default function DashboardShell({ session }) {
                 idx={i}
                 c={c}
                 isLight={isLight}
-                onClick={() => setOpenKey(t.key)}
+                onClick={() => trackAndOpen(t.key)}
               />
             );
           })}
@@ -811,7 +843,6 @@ export default function DashboardShell({ session }) {
 
       <MobileNav tiles={mobileNavTiles} onOpen={handleMobileNavOpen} c={c} />
 
-      {/* LayerModal — only for non-special tiles */}
       <LayerModal
         open={!!active}
         zIndex={55}

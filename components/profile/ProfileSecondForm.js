@@ -4,7 +4,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import LayerModal from "@/components/LayerModal";
 import { SectionHeader, Field, ErrorBanner, LoadingSpinner } from "./ProfileSubComponents";
-import { parsePhoneNumberFromString } from "libphonenumber-js/min";
 
 /* ═══════════════════════════════════════════════
    SMART HELPERS
@@ -46,16 +45,6 @@ async function lookupPin(pin) {
       const result = { city: po.District || po.Division || "", state: po.State || "" };
       _pinCache[p] = result;
       return result;
-    }
-  } catch {}
-  return null;
-}
-
-function autoDetectCountryCode(raw) {
-  try {
-    const parsed = parsePhoneNumberFromString(raw);
-    if (parsed && parsed.countryCallingCode) {
-      return `+${parsed.countryCallingCode}`;
     }
   } catch {}
   return null;
@@ -270,7 +259,7 @@ function CountryCodeDropdown({ value, onChange, c }) {
 
   const currentLabel = useMemo(() => {
     const found = COUNTRY_CODES.find((cc) => cc.code === value);
-    return found ? found.label : value || "+91";
+    return found ? found.label : value || "🇮🇳 +91";
   }, [value]);
 
   return (
@@ -331,25 +320,15 @@ function CountryCodeDropdown({ value, onChange, c }) {
 }
 
 /* ═══════════════════════════════════════════════
-   PHONE + COUNTRY CODE COMBO FIELD
+   PHONE + COUNTRY CODE COMBO FIELD (simple, no auto-detect)
    ═══════════════════════════════════════════════ */
 
 function PhoneComboField({ label, required, countryCode, number, onCountryCodeChange, onNumberChange,
   c, placeholder, invalid, valid, hint, icon, id }) {
 
   function handleNumberChange(raw) {
-    const val = String(raw || "");
-    onNumberChange(val);
-    const detected = autoDetectCountryCode(val.startsWith("+") ? val : `+${val}`);
-    if (detected) {
-      onCountryCodeChange(detected);
-      try {
-        const parsed = parsePhoneNumberFromString(val.startsWith("+") ? val : `+${val}`);
-        if (parsed && parsed.isValid()) {
-          onNumberChange(String(parsed.nationalNumber || ""));
-        }
-      } catch {}
-    }
+    const digits = String(raw || "").replace(/\D/g, "");
+    onNumberChange(digits);
   }
 
   const borderColor = invalid ? c.smartInputErrorBorder : valid ? c.smartInputValidBorder : c.inputBorder;
@@ -365,7 +344,7 @@ function PhoneComboField({ label, required, countryCode, number, onCountryCodeCh
         <CountryCodeDropdown value={countryCode || "+91"} onChange={onCountryCodeChange} c={c} />
         <div className="relative flex-1">
           <input id={id} value={number || ""} onChange={(e) => handleNumberChange(e.target.value)}
-            placeholder={placeholder} inputMode="tel"
+            placeholder={placeholder} inputMode="numeric"
             className="w-full rounded-2xl max-md:rounded-xl border px-4 max-md:px-3.5 py-3 max-md:py-2.5 text-[13px] font-mono tracking-wider outline-none will-change-transform"
             style={{ background: bgColor, borderColor, color: c.inputText,
               paddingRight: (valid || invalid) ? "40px" : "16px", transition: "border-color .15s, box-shadow .15s, background .15s" }}
@@ -411,8 +390,10 @@ export default function ProfileSecondForm({
       setEntered(false);
       requestAnimationFrame(() => setEntered(true));
       setFieldErrors({});
+      // Force address2 to empty when modal opens
+      setReg2((p) => ({ ...(p || {}), address2: "" }));
     }
-  }, [open]);
+  }, [open, setReg2]);
 
   useEffect(() => {
     if (!reg2?.pinCode) { setPinHint(""); return; }
@@ -610,7 +591,10 @@ export default function ProfileSecondForm({
               options={[
                 { value: "mother", label: "👩 Mother" },
                 { value: "father", label: "👨 Father" },
-                { value: "parents", label: "👨‍👩‍👧 Parents" },
+                  { value: "parents", label: "👫🏻 Parents" },
+                { value: "Wife", label: "💆🏻‍♀️ Wife" },
+                { value: "Husband", label: "👨‍👩‍👧 Husband" },
+  
                 { value: "other", label: "📝 Other" },
               ]}
               c={c} placeholder="Select relation..."
@@ -623,12 +607,16 @@ export default function ProfileSecondForm({
                 invalid={isErr("familyMemberRelationOther")}
               />
             )}
-            <SmartField label="Mobile" required value={reg2.familyMemberMobile}
-              onChange={(v) => upd("familyMemberMobile", v)} c={c} placeholder="Phone number..."
-              inputMode="tel" mono id="sf_familyMemberMobile"
-              valid={isPhoneValid(reg2.familyMemberMobile) && !isErr("familyMemberMobile")}
-              invalid={isErr("familyMemberMobile") || (reg2.familyMemberMobile?.length > 0 && !isPhoneValid(reg2.familyMemberMobile))}
-            />
+            <div className="sm:col-span-2">
+              <PhoneComboField label="Mobile" required
+                countryCode={reg2.familyMemberCountryCode || "+91"} number={reg2.familyMemberMobile}
+                onCountryCodeChange={(v) => upd("familyMemberCountryCode", v)}
+                onNumberChange={(v) => upd("familyMemberMobile", v)}
+                c={c} placeholder="Phone number..." id="sf_familyMemberMobile"
+                valid={isPhoneValid(reg2.familyMemberMobile) && !isErr("familyMemberMobile")}
+                invalid={isErr("familyMemberMobile") || (reg2.familyMemberMobile?.length > 0 && !isPhoneValid(reg2.familyMemberMobile))}
+              />
+            </div>
           </FormSection>
 
           {/* ═══ Address ═══ */}

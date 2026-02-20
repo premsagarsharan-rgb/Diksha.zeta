@@ -10,6 +10,28 @@ import { HistorySection } from "./history";
 import ContainerLockBanner from "./ContainerLockBanner";
 import BufferSpinner from "@/components/BufferSpinner";
 
+// ═══════ PRIORITY SORT HELPERS ═══════
+function getPriorityGroup(a) {
+  const kind = (a?.kind || "SINGLE").toUpperCase();
+  const gender = (a?.customer?.gender || "").toUpperCase();
+
+  if (kind === "COUPLE") return "COUPLE";
+  if (kind === "SINGLE" && gender === "FEMALE") return "SINGLE_FEMALE";
+  return "SINGLE_MALE";
+}
+
+function priorityRank(group) {
+  if (group === "COUPLE") return 0;
+  if (group === "SINGLE_FEMALE") return 1;
+  return 2; // SINGLE_MALE
+}
+
+function sortByPriority(assignments) {
+  return [...assignments].sort((a, b) => {
+    return priorityRank(getPriorityGroup(a)) - priorityRank(getPriorityGroup(b));
+  });
+}
+
 export default function ContainerPanel({
   container,
   assignments,
@@ -30,6 +52,7 @@ export default function ContainerPanel({
   onUnlockContainer,
   onPrintAll,
   onPrintList,
+  onPrintToken,      // ← TOKEN PRINT PROP (original)
   onOpenProfile,
   onConfirm,
   onReject,
@@ -37,7 +60,7 @@ export default function ContainerPanel({
   onDone,
   onChangeDate,
   onShowWarn,
-  variant = "default", // "default" (desktop modal) | "inline" (mobile)
+  variant = "default",
 }) {
   const { theme } = useTheme();
   const isLight = theme === "light";
@@ -46,17 +69,14 @@ export default function ContainerPanel({
 
   const [mobileTab, setMobileTab] = useState("LIST");
 
-  // Blueprint section controls
   const [reservedOpen, setReservedOpen] = useState(true);
   const [reservedShowAll, setReservedShowAll] = useState(false);
 
-  // Mobile action dock
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
 
   const isReady = !!container && (selectedDate ? container?.date === selectedDate : true);
   const isInline = variant === "inline";
 
-  // Lock status
   const lock = getLockStatus(container, counts, reservedCounts);
   const isLocked = lock.isLocked;
 
@@ -66,6 +86,9 @@ export default function ContainerPanel({
   const maxPreview = isInline ? 3 : 8;
   const reservedDisplay = reservedShowAll ? reservedList : reservedList.slice(0, maxPreview);
   const hasMoreReserved = reservedList.length > maxPreview;
+
+  // ═══════ SORT ASSIGNMENTS BY PRIORITY ═══════
+  const sortedAssignments = sortByPriority(assignments);
 
   if (containerLoading && isInline) {
     return (
@@ -105,20 +128,21 @@ export default function ContainerPanel({
 
   if (!isReady) return null;
 
+  // ═══════ LIST CONTENT — PRIORITY SORTED + priorityGroup PROP ═══════
   const listContent = (
     <>
       {!showList ? (
         <div style={{ color: c.t3, fontSize: 13, textAlign: "center", padding: "20px 0" }}>
           List hidden. Tap 👁 to show.
         </div>
-      ) : assignments.length === 0 ? (
+      ) : sortedAssignments.length === 0 ? (
         <div style={{ textAlign: "center", padding: "24px 0" }}>
           <div style={{ fontSize: 28, marginBottom: 6 }}>📭</div>
           <div style={{ color: c.t3, fontSize: 13 }}>No customers in this container.</div>
         </div>
       ) : (
         <div className={isInline ? "space-y-2" : "grid sm:grid-cols-2 lg:grid-cols-2 gap-2"}>
-          {assignments.map((a, idx) => (
+          {sortedAssignments.map((a, idx) => (
             <AssignmentCard
               key={a._id || idx}
               assignment={a}
@@ -126,6 +150,7 @@ export default function ContainerPanel({
               containerMode={mode}
               pushing={pushing}
               locked={isLocked}
+              priorityGroup={getPriorityGroup(a)}
               onOpenProfile={onOpenProfile}
               onConfirm={onConfirm}
               onReject={onReject}
@@ -151,7 +176,6 @@ export default function ContainerPanel({
         overflow: "hidden",
       }}
     >
-      {/* Blueprint grid */}
       <div
         aria-hidden
         style={{
@@ -267,12 +291,11 @@ export default function ContainerPanel({
     </div>
   ) : null;
 
-  // Mobile dock colors (black background as requested)
   const dockBtnBg = isLight ? "rgba(15,23,42,0.92)" : "rgba(0,0,0,0.72)";
   const dockBtnBorder = "rgba(255,255,255,0.12)";
   const dockBtnText = "rgba(255,255,255,0.92)";
 
-  // Build action items for mobile dock (close on click)
+  // ═══════ MOBILE ACTIONS — TOKEN PRINT INCLUDED ═══════
   const mobileActions = [
     ...(role === "ADMIN"
       ? [
@@ -317,6 +340,14 @@ export default function ContainerPanel({
       title: "Print list",
       disabled: pushing,
       onClick: () => onPrintList?.(),
+    },
+    // ✅ TOKEN PRINT (Mobile) — original preserved
+    {
+      key: "printToken",
+      icon: "🎫",
+      title: "Print token",
+      disabled: pushing,
+      onClick: () => onPrintToken?.(),
     },
     {
       key: "toggleList",
@@ -415,7 +446,7 @@ export default function ContainerPanel({
           </div>
         </div>
 
-        {/* Actions */}
+        {/* ═══════ ACTIONS — TOKEN PRINT INCLUDED ═══════ */}
         <div style={{ flexShrink: 0, position: "relative", zIndex: 120 }}>
           {isInline ? (
             <MobileActionsDock
@@ -460,6 +491,16 @@ export default function ContainerPanel({
                 c={c}
               />
               <ActionIconBtn icon="📄" title="Print list" disabled={pushing} onClick={onPrintList} c={c} />
+
+              {/* ✅ TOKEN PRINT (Desktop) — original preserved */}
+              <ActionIconBtn
+                icon="🎫"
+                title="Print token"
+                disabled={pushing}
+                onClick={onPrintToken}
+                c={c}
+              />
+
               <ActionIconBtn
                 icon={showList ? "👁" : "👁‍🗨"}
                 title={showList ? "Hide list" : "Show list"}
@@ -482,10 +523,8 @@ export default function ContainerPanel({
         variant={isInline ? "compact" : "default"}
       />
 
-      {/* MOBILE: blueprint stacked */}
       {isInline && blueprintPanel ? <div style={{ marginBottom: 12 }}>{blueprintPanel}</div> : null}
 
-      {/* Mobile tabs */}
       {isInline && (
         <div className="flex gap-1.5" style={{ marginBottom: 12 }}>
           <TabBtn label={`📋 List (${counts.total})`} active={mobileTab === "LIST"} onClick={() => setMobileTab("LIST")} c={c} />
@@ -502,12 +541,10 @@ export default function ContainerPanel({
         </div>
       )}
 
-      {/* STATS tab */}
       {isInline && mobileTab === "STATS" ? (
         <MobileStatsContent container={container} counts={counts} reservedCounts={reservedCounts} mode={mode} c={c} />
       ) : null}
 
-      {/* HISTORY tab — Phase2: pass pendingCount + containerDate */}
       {isInline && mobileTab === "HISTORY" && mode === "MEETING" ? (
         <HistorySection
           historyRecords={historyRecords}
@@ -518,7 +555,6 @@ export default function ContainerPanel({
         />
       ) : null}
 
-      {/* DESKTOP: Diksha => LEFT list + RIGHT blueprint */}
       {!isInline && mode === "DIKSHA" && blueprintPanel ? (
         <div className="grid lg:grid-cols-3 gap-3" style={{ marginTop: 12 }}>
           <div className="lg:col-span-2">{listContent}</div>
@@ -528,7 +564,6 @@ export default function ContainerPanel({
         <div style={{ marginTop: 12 }}>{isInline ? (mobileTab === "LIST" ? listContent : null) : listContent}</div>
       )}
 
-      {/* Desktop history below list — Phase2: pass pendingCount + containerDate */}
       {!isInline && mode === "MEETING" && (historyRecords?.length || 0) > 0 ? (
         <div style={{ marginTop: 16 }}>
           <HistorySection

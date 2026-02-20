@@ -784,9 +784,10 @@ function TriStateCard({ icon, label, value, onChange, expandContent, c }) {
   const isNo = value === false;
   const isNeutral = value === null || value === undefined;
 
-  const bgColor = isYes ? c.triYesBg : isNo ? c.triNoBg : c.triNeutralBg;
-  const borderColor = isYes ? c.triYesBorder : isNo ? c.triNoBorder : c.triNeutralBorder;
-  const textColor = isYes ? c.triYesText : isNo ? c.triNoText : c.triNeutralText;
+  // REVERSED: Yes gets red colors, No gets green colors
+  const bgColor = isYes ? c.triNoBg : isNo ? c.triYesBg : c.triNeutralBg;
+  const borderColor = isYes ? c.triNoBorder : isNo ? c.triYesBorder : c.triNeutralBorder;
+  const textColor = isYes ? c.triNoText : isNo ? c.triYesText : c.triNeutralText;
 
   return (
     <div
@@ -803,11 +804,11 @@ function TriStateCard({ icon, label, value, onChange, expandContent, c }) {
           <div
             className="text-[10px] max-md:text-[9px] font-medium mt-0.5"
             style={{
-              color: isYes ? c.triYesText : isNo ? c.triNoText : c.hintColor,
+              color: isYes ? c.triNoText : isNo ? c.triYesText : c.hintColor,
               opacity: isNeutral ? 0.6 : 0.8,
             }}
           >
-            {isYes ? "✓ Yes" : isNo ? "✗ No" : "Not selected"}
+            {isYes ? "✗ Yes" : isNo ? "✓ No" : "Not selected"}
           </div>
         </div>
 
@@ -820,10 +821,10 @@ function TriStateCard({ icon, label, value, onChange, expandContent, c }) {
             onClick={() => onChange(false)}
             className="px-3 max-md:px-2.5 py-1.5 max-md:py-1 text-[11px] max-md:text-[10px] font-bold active:scale-95"
             style={{
-              background: isNo ? c.triNoBg : "transparent",
-              color: isNo ? c.triNoText : c.triIcon,
+              background: isNo ? c.triYesBg : "transparent",
+              color: isNo ? c.triYesText : c.triIcon,
               borderRight: `1px solid ${c.triPillBorder}`,
-              boxShadow: isNo ? `inset 0 0 0 1.5px ${c.triNoBorder}` : "none",
+              boxShadow: isNo ? `inset 0 0 0 1.5px ${c.triYesBorder}` : "none",
               transition: "all .12s",
             }}
           >
@@ -848,9 +849,9 @@ function TriStateCard({ icon, label, value, onChange, expandContent, c }) {
             onClick={() => onChange(true)}
             className="px-3 max-md:px-2.5 py-1.5 max-md:py-1 text-[11px] max-md:text-[10px] font-bold active:scale-95"
             style={{
-              background: isYes ? c.triYesBg : "transparent",
-              color: isYes ? c.triYesText : c.triIcon,
-              boxShadow: isYes ? `inset 0 0 0 1.5px ${c.triYesBorder}` : "none",
+              background: isYes ? c.triNoBg : "transparent",
+              color: isYes ? c.triNoText : c.triIcon,
+              boxShadow: isYes ? `inset 0 0 0 1.5px ${c.triNoBorder}` : "none",
               transition: "all .12s",
             }}
           >
@@ -861,7 +862,7 @@ function TriStateCard({ icon, label, value, onChange, expandContent, c }) {
         <div
           className="w-2.5 h-2.5 max-md:w-2 max-md:h-2 rounded-full flex-shrink-0"
           style={{
-            background: isYes ? c.triYesText : isNo ? c.triNoText : c.triNeutralDot,
+            background: isYes ? c.triNoText : isNo ? c.triYesText : c.triNeutralDot,
             transition: "background .15s",
           }}
         />
@@ -1287,14 +1288,14 @@ export default function AddCustomer({ session }) {
           submissionId, commitMessage,
           name: form.name, age: form.age, gender: form.gender,
           country: form.country, state: stateFinal, city: cityFinal,
-          address: computedAddress, occupation: form.occupation,
+         occupation: form.occupation,
           approver: form.approver, maritalStatus: form.maritalStatus,
           dikshaYear: form.dikshaYear, vrindavanVisits: form.vrindavanVisits,
           firstDikshaYear: form.firstDikshaYear,
           familyPermission: Boolean(form.familyPermissionRelation),
           familyPermissionRelation: form.familyPermissionRelation,
           familyPermissionOther: form.familyPermissionRelation === "other" ? form.familyPermissionOther : "",
-          remarks: username, remarksBy: username,
+          remarksBy: username,
           onionGarlic: form.onionGarlic === true,
           onionGarlicNote: form.onionGarlic === true ? String(form.onionGarlicNote || "").trim() : "",
           hasPet: form.hasPet === true,
@@ -1562,7 +1563,7 @@ export default function AddCustomer({ session }) {
                     value={form.petNote}
                     onChange={(v) => upd("petNote", v)}
                     suggestions={PET_SUGGESTIONS}
-                    placeholder="e.g. Dog, Cat, Cow..."
+                    placeholder="e.g. Dog, Cat, Brids, Fish, etc....."
                     c={c}
                   />
                 </div>

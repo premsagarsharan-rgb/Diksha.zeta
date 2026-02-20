@@ -3,7 +3,6 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { SectionHeader, Field, Select, Toggle, ErrorBanner, LoadingSpinner } from "./ProfileSubComponents";
-import { parsePhoneNumberFromString } from "libphonenumber-js/min";
 
 /* ═══════════════════════════════════════════════
    CONSTANTS
@@ -101,14 +100,6 @@ function isAadhaarValid(raw) {
 function isPhoneValid(num) {
   const digits = String(num || "").replace(/\D/g, "");
   return digits.length >= 8 && digits.length <= 15;
-}
-
-function autoDetectCountryCode(raw) {
-  try {
-    const parsed = parsePhoneNumberFromString(raw);
-    if (parsed && parsed.countryCallingCode) return `+${parsed.countryCallingCode}`;
-  } catch {}
-  return null;
 }
 
 function phoneDisplay(code, num) {
@@ -283,14 +274,16 @@ function SuggestInputInline({ value, onChange, suggestions, placeholder, c }) {
 }
 
 /* ═══════════════════════════════════════════════
-   TRI-STATE TOGGLE
+   TRI-STATE TOGGLE (REVERSED COLORS)
    ═══════════════════════════════════════════════ */
 
 function TriToggle({ icon, label, value, onChange, expandContent, c }) {
   const isYes = value === true; const isNo = value === false; const isNeutral = value === null || value === undefined;
-  const bgColor = isYes ? (c.triYesBg || "rgba(34,197,94,0.08)") : isNo ? (c.triNoBg || "rgba(239,68,68,0.06)") : (c.triNeutralBg || "rgba(128,128,128,0.04)");
-  const borderColor = isYes ? (c.triYesBorder || "rgba(34,197,94,0.20)") : isNo ? (c.triNoBorder || "rgba(239,68,68,0.15)") : (c.triNeutralBorder || c.inputBorder);
-  const textColor = isYes ? (c.triYesText || "#4ade80") : isNo ? (c.triNoText || "#f87171") : (c.triNeutralText || c.t3);
+
+  // REVERSED: Yes gets red/no colors, No gets green/yes colors
+  const bgColor = isYes ? (c.triNoBg || "rgba(239,68,68,0.06)") : isNo ? (c.triYesBg || "rgba(34,197,94,0.08)") : (c.triNeutralBg || "rgba(128,128,128,0.04)");
+  const borderColor = isYes ? (c.triNoBorder || "rgba(239,68,68,0.15)") : isNo ? (c.triYesBorder || "rgba(34,197,94,0.20)") : (c.triNeutralBorder || c.inputBorder);
+  const textColor = isYes ? (c.triNoText || "#f87171") : isNo ? (c.triYesText || "#4ade80") : (c.triNeutralText || c.t3);
   const pillBg = c.triPillBg || "rgba(128,128,128,0.06)"; const pillBorder = c.triPillBorder || c.inputBorder; const pillIcon = c.triIcon || c.t3;
 
   return (
@@ -301,12 +294,12 @@ function TriToggle({ icon, label, value, onChange, expandContent, c }) {
         <div className="flex-1 min-w-0">
           <div className="text-[12px] max-md:text-[11px] font-semibold leading-tight" style={{ color: textColor }}>{label}</div>
           <div className="text-[9.5px] max-md:text-[8.5px] font-medium mt-0.5" style={{ color: textColor, opacity: isNeutral ? 0.5 : 0.7 }}>
-            {isYes ? "✓ Yes" : isNo ? "✗ No" : "Not selected"}</div>
+            {isYes ? "✗ Yes" : isNo ? "✓ No" : "Not selected"}</div>
         </div>
         <div className="flex rounded-xl max-md:rounded-lg overflow-hidden border flex-shrink-0" style={{ borderColor: pillBorder, background: pillBg }}>
-          {[{ v: false, l: "No", bg: c.triNoBg, cl: c.triNoText, bd: c.triNoBorder },
+          {[{ v: false, l: "No", bg: c.triYesBg, cl: c.triYesText, bd: c.triYesBorder },
             { v: null, l: "—", bg: c.triPillActiveBg, cl: c.triNeutralText, bd: c.triNeutralBorder },
-            { v: true, l: "Yes", bg: c.triYesBg, cl: c.triYesText, bd: c.triYesBorder }].map((btn, i) => {
+            { v: true, l: "Yes", bg: c.triNoBg, cl: c.triNoText, bd: c.triNoBorder }].map((btn, i) => {
             const active = value === btn.v || (btn.v === null && isNeutral);
             return (
               <button key={i} type="button" onClick={() => onChange(btn.v)}
@@ -322,7 +315,7 @@ function TriToggle({ icon, label, value, onChange, expandContent, c }) {
           })}
         </div>
         <div className="w-2 h-2 rounded-full flex-shrink-0"
-          style={{ background: isYes ? (c.triYesText || "#4ade80") : isNo ? (c.triNoText || "#f87171") : (c.triNeutralDot || "rgba(128,128,128,0.15)"), transition: "background .15s" }} />
+          style={{ background: isYes ? (c.triNoText || "#f87171") : isNo ? (c.triYesText || "#4ade80") : (c.triNeutralDot || "rgba(128,128,128,0.15)"), transition: "background .15s" }} />
       </div>
       {isYes && expandContent && (
         <div className="px-3.5 max-md:px-3 pb-3 max-md:pb-2.5 pt-1"
@@ -379,7 +372,7 @@ function CountryCodeDropdown({ value, onChange, c }) {
 
   const currentLabel = useMemo(() => {
     const found = COUNTRY_CODES.find((cc) => cc.code === value);
-    return found ? found.label : value || "+91";
+    return found ? found.label : value || "🇮🇳 +91";
   }, [value]);
 
   return (
@@ -427,21 +420,13 @@ function CountryCodeDropdown({ value, onChange, c }) {
 }
 
 /* ═══════════════════════════════════════════════
-   PHONE COMBO FIELD (edit mode)
+   PHONE COMBO FIELD (simple, no auto-detect)
    ═══════════════════════════════════════════════ */
 
 function PhoneComboField({ label, required, countryCode, number, onCountryCodeChange, onNumberChange, c, placeholder }) {
   function handleNumberChange(raw) {
-    const val = String(raw || "");
-    onNumberChange(val);
-    const detected = autoDetectCountryCode(val.startsWith("+") ? val : `+${val}`);
-    if (detected) {
-      onCountryCodeChange(detected);
-      try {
-        const parsed = parsePhoneNumberFromString(val.startsWith("+") ? val : `+${val}`);
-        if (parsed && parsed.isValid()) onNumberChange(String(parsed.nationalNumber || ""));
-      } catch {}
-    }
+    const digits = String(raw || "").replace(/\D/g, "");
+    onNumberChange(digits);
   }
 
   const valid = isPhoneValid(number);
@@ -454,7 +439,7 @@ function PhoneComboField({ label, required, countryCode, number, onCountryCodeCh
       <div className="flex gap-2 max-md:gap-1.5">
         <CountryCodeDropdown value={countryCode || "+91"} onChange={onCountryCodeChange} c={c} />
         <div className="relative flex-1">
-          <input value={number || ""} onChange={(e) => handleNumberChange(e.target.value)} placeholder={placeholder} inputMode="tel"
+          <input value={number || ""} onChange={(e) => handleNumberChange(e.target.value)} placeholder={placeholder} inputMode="numeric"
             className="w-full rounded-2xl max-md:rounded-xl border px-4 max-md:px-3.5 py-3 max-md:py-2.5 text-[13px] font-mono tracking-wider outline-none will-change-transform"
             style={{ background: c.inputBg, borderColor: c.inputBorder, color: c.inputText, transition: "border-color .15s, box-shadow .15s" }}
             onFocusCapture={(e) => { e.currentTarget.style.boxShadow = `0 0 0 3px ${c.inputFocusRing}`; e.currentTarget.style.borderColor = c.inputBorderFocus; }}
@@ -580,7 +565,6 @@ export default function ProfileInfoPanel({
   const hasGuardianData = customer?.guardianName;
   const hasFamilyMemberData = customer?.familyMemberName;
 
-  // Aadhaar handler for edit
   function onAadhaarChange(raw) {
     const digits = String(raw || "").replace(/\D/g, "").slice(0, 12);
     upd("idValue", formatAadhaar(digits));
@@ -692,7 +676,7 @@ export default function ProfileInfoPanel({
             <CollapsibleSection icon="👨‍👩‍👧" label="Family Member" open={expandedSections.familyMember} onToggle={() => toggleSection("familyMember")} c={c} badge="✓">
               <ReadRow k="Name" v={customer?.familyMemberName} c={c} idx={0} copyable />
               <ReadRow k="Relation" v={customer?.familyMemberRelation === "other" ? customer?.familyMemberRelationOther : customer?.familyMemberRelation} c={c} idx={1} />
-              <ReadRow k="Mobile" v={customer?.familyMemberMobile} c={c} idx={2} icon="📱" copyable mono />
+              <ReadRow k="Mobile" v={phoneDisplay(customer?.familyMemberCountryCode, customer?.familyMemberMobile)} c={c} idx={2} icon="📱" copyable mono />
             </CollapsibleSection>
           )}
         </div>
@@ -892,10 +876,6 @@ export default function ProfileInfoPanel({
           </div>
         </CollapsibleSection>
 
-        {/* ══════════════════════════════════════
-           NEW: SecondForm fields in Edit Mode
-           ══════════════════════════════════════ */}
-
         {/* ── Phone & WhatsApp ── */}
         <CollapsibleSection icon="📱" label="Phone & WhatsApp" open={expandedSections.contact} onToggle={() => toggleSection("contact")} c={c}>
           <div className="space-y-3 max-md:space-y-2.5">
@@ -922,7 +902,6 @@ export default function ProfileInfoPanel({
         {/* ── Identity ── */}
         <CollapsibleSection icon="🪪" label="Identity" open={expandedSections.identity} onToggle={() => toggleSection("identity")} c={c}>
           <div className="space-y-3 max-md:space-y-2.5">
-            {/* ID Type selector */}
             <div className="flex flex-wrap gap-2 max-md:gap-1.5">
               {[
                 { val: "aadhaar", label: "🪪 AADHAAR", desc: "12-digit" },
@@ -1000,14 +979,20 @@ export default function ProfileInfoPanel({
               <Field label="Other Relation" value={form.familyMemberRelationOther}
                 onChange={(v) => upd("familyMemberRelationOther", v)} c={c} placeholder="Type relation..." />
             )}
-            <Field label="Mobile" value={form.familyMemberMobile} onChange={(v) => upd("familyMemberMobile", v)} c={c} placeholder="Phone number..." />
+            <div className="sm:col-span-2">
+              <PhoneComboField label="Mobile"
+                countryCode={form.familyMemberCountryCode || "+91"} number={form.familyMemberMobile}
+                onCountryCodeChange={(v) => upd("familyMemberCountryCode", v)}
+                onNumberChange={(v) => upd("familyMemberMobile", v)}
+                c={c} placeholder="Phone number..." />
+            </div>
           </div>
         </CollapsibleSection>
 
         {/* ── PIN + Full Address ── */}
         <CollapsibleSection icon="🏠" label="Full Address & PIN" open={expandedSections.address} onToggle={() => toggleSection("address")} c={c}>
           <div className="grid sm:grid-cols-2 gap-3 max-md:gap-2.5">
-            <Field label="PIN Code" value={form.pinCode} onChange={(v) => upd("pinCode", String(v || "").replace(/\D/g, "").slice(0, 6))}
+            <Field label="PIN Code" value={form.pinCode || form.pincode} onChange={(v) => { upd("pinCode", String(v || "").replace(/\D/g, "").slice(0, 6)); upd("pincode", String(v || "").replace(/\D/g, "").slice(0, 6)); }}
               c={c} placeholder="6 digits..." />
             <div className="sm:col-span-2">
               <div className="text-[11px] max-md:text-[10px] font-semibold mb-1.5 max-md:mb-1" style={{ color: c.labelColor }}>Full Address</div>

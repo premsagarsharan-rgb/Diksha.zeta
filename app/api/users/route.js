@@ -1,21 +1,17 @@
 // app/api/users/route.js
+// ✅ MODIFIED — Activity tracking for user list + user create
+
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getDb } from "@/lib/mongodb";
 import { getSession } from "@/lib/session.server";
+import { logActivity, extractRequestInfo } from "@/lib/activityLogger";
 
 export const runtime = "nodejs";
 
 const PERM_KEYS = [
-  "recent",
-  "add",
-  "calander",
-  "pending",
-  "sitting",
-  "tracker",
-  "screensCreate",
-  "screensView",
-  "screens",
+  "recent", "add", "calander", "pending", "sitting",
+  "tracker", "screensCreate", "screensView", "screens",
 ];
 
 async function ensureUserIndexes(db) {
@@ -40,7 +36,7 @@ function normalizePermissionsForSave(input) {
   return clean;
 }
 
-export async function GET() {
+export async function GET(req) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -55,7 +51,6 @@ export async function GET() {
     .project({ passwordHash: 0 })
     .toArray();
 
-  // ✅ Clean session data — don't expose tokenHash to frontend
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   const items = users.map((u) => {
@@ -77,6 +72,20 @@ export async function GET() {
     };
   });
 
+  // ═══════ LOG USER LIST VIEW ═══════
+  const reqInfo = extractRequestInfo(req);
+  logActivity({
+    userId: session.userId,
+    username: session.username,
+    action: "user_list_view",
+    category: "ADMIN",
+    description: `Admin viewed user list — ${items.length} users`,
+    meta: { userCount: items.length },
+    ip: reqInfo.ip,
+    device: reqInfo.device,
+    severity: "info",
+  });
+
   return NextResponse.json({ items });
 }
 
@@ -85,6 +94,7 @@ export async function POST(req) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const reqInfo = extractRequestInfo(req);
   const body = await req.json().catch(() => ({}));
   const { username, password, role, permissions } = body || {};
 
@@ -115,14 +125,8 @@ export async function POST(req) {
 
   if (role === "USER") {
     const defaults = {
-      recent: true,
-      add: true,
-      calander: true,
-      pending: true,
-      sitting: false,
-      tracker: false,
-      screensCreate: false,
-      screensView: false,
+      recent: true, add: true, calander: true, pending: true,
+      sitting: false, tracker: false, screensCreate: false, screensView: false,
     };
     doc.permissions = normalizePermissionsForSave({ ...defaults, ...(permissions || {}) });
   } else {
@@ -131,11 +135,57 @@ export async function POST(req) {
 
   try {
     const r = await db.collection("users").insertOne(doc);
+
+    // ═══════ LOG USER CREATED ═══════
+    logActivity({
+      userId: session.userId,
+      username: session.username,
+      action: "user_create",
+      category: "ADMIN",
+      description: `Created new user "${uname}" — Role: ${role}`,
+      meta: {
+        createdUserId: String(r.insertedId),
+        createdUsername: uname,
+        role,
+        permissions: doc.permissions,
+      },
+      ip: reqInfo.ip,
+      device: reqInfo.device,
+      severity: "info",
+    });
+
     return NextResponse.json({ ok: true, id: String(r.insertedId) });
   } catch (e) {
     if (String(e?.code) === "11000") {
+      // ═══════ LOG DUPLICATE USERNAME ═══════
+      logActivity({
+        userId: session.userId,
+        username: session.username,
+        action: "user_create_failed",
+        category: "ADMIN",
+        description: `Failed to create user "${uname}" — username already exists`,
+        meta: { attemptedUsername: uname, reason: "duplicate" },
+        ip: reqInfo.ip,
+        device: reqInfo.device,
+        severity: "warning",
+      });
+
       return NextResponse.json({ error: "Username already exists" }, { status: 409 });
     }
+
+    // ═══════ LOG CREATE ERROR ═══════
+    logActivity({
+      userId: session.userId,
+      username: session.username,
+      action: "user_create_error",
+      category: "SECURITY",
+      description: `Server error creating user "${uname}"`,
+      meta: { error: e?.message },
+      ip: reqInfo.ip,
+      device: reqInfo.device,
+      severity: "critical",
+    });
+
     return NextResponse.json({ error: "Create user failed" }, { status: 500 });
   }
 }

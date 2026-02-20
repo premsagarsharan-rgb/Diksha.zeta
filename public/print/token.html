@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎫 Token Print</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 0;
+        }
+
+        body {
+            background: #64748b;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            padding-bottom: 80px;
+        }
+
+        .screen-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .screen-header h1 {
+            font-size: 20px;
+            font-weight: 800;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .screen-header p {
+            font-size: 12px;
+            color: rgba(255,255,255,0.7);
+        }
+
+        .a4-page {
+            width: 210mm;
+            height: 297mm;
+            margin: 0 auto 30px auto;
+            background: #fff;
+            box-shadow: 0 4px 30px rgba(0,0,0,0.3);
+            border-radius: 4px;
+            padding: 5mm;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: repeat(4, 1fr);
+            gap: 2mm;
+            page-break-after: always;
+            break-after: page;
+            overflow: hidden;
+        }
+
+        .a4-page:last-child {
+            page-break-after: auto;
+            break-after: auto;
+        }
+
+        /* ══════════════════════════════════════
+           CARD
+           ══════════════════════════════════════ */
+        .card {
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            overflow: hidden;
+        }
+
+        .form-box {
+            border: 2.5px solid #000;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ===== HEADER ===== */
+        .header-row {
+            display: flex;
+            border-bottom: 2.5px solid #000;
+            flex-shrink: 0;
+        }
+
+        .header-cell {
+            padding: 2px 5px;
+            font-size: 9px;
+            font-weight: 900;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: Arial, sans-serif;
+        }
+
+        .cell-gender {
+            border-right: 2px solid #000;
+            padding: 2px 8px;
+            font-size: 14px;
+            min-width: 28px;
+        }
+
+        .cell-date {
+            flex: 1;
+            border-right: 2px solid #000;
+            font-size: 9px;
+        }
+
+        .cell-token {
+            flex: 1;
+            font-size: 9px;
+        }
+
+        /* ===== BODY ===== */
+        .form-body {
+            flex: 1;
+            padding: 2px 5px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-evenly;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        /* ───────────────────────────────────
+           FORM ROW
+           
+           Clean colon-based layout:
+           • नाम और उम्र :  OGGY (25)
+           
+           - No vertical bar
+           - Hindi maatrayen fully visible
+           - Proper line-height for Hindi
+           ─────────────────────────────────── */
+        .form-row {
+            display: flex;
+            align-items: flex-end;
+            padding: 0;
+            margin: 0;
+        }
+
+        .form-row .bullet {
+            width: 2.5px;
+            height: 2.5px;
+            background: #000;
+            border-radius: 50%;
+            margin-right: 2px;
+            flex-shrink: 0;
+            margin-bottom: 3px;
+        }
+
+        /*
+         * Label with colon
+         * Fixed width so all colons align vertically
+         * line-height: 1.5 → Hindi maatrayen (ू ी ै ों) 
+         * will NOT get clipped
+         */
+        .form-row .label-text {
+            font-size: 6.5px;
+            font-weight: 700;
+            color: #000;
+            white-space: nowrap;
+            font-family: Arial, sans-serif;
+            min-width: 62px;
+            max-width: 62px;
+            flex-shrink: 0;
+            text-align: left;
+            line-height: 1.5;
+            padding-right: 1px;
+        }
+
+        /*
+         * Value — bold, uppercase (English)
+         * Sits on underline after colon
+         * line-height: 1.5 for Hindi support
+         */
+        .form-row .value-text {
+            flex: 1;
+            min-width: 0;
+            border-bottom: 0.8px solid #000;
+            font-size: 7px;
+            font-weight: 800;
+            color: #000;
+            text-transform: uppercase;
+            padding-bottom: 0px;
+            padding-left: 2px;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            line-height: 1.5;
+            letter-spacing: 0.01em;
+        }
+
+        /*
+         * Hindi value — no uppercase
+         * Same alignment, same line-height
+         */
+        .form-row .value-text-hi {
+            flex: 1;
+            min-width: 0;
+            border-bottom: 0.8px solid #000;
+            font-size: 7px;
+            font-weight: 800;
+            color: #000;
+            text-transform: none;
+            padding-bottom: 0px;
+            padding-left: 2px;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            line-height: 1.5;
+        }
+
+        /* Empty line (for hand-fill) */
+        .form-row .line {
+            flex: 1;
+            border-bottom: 0.8px solid #000;
+            min-width: 20px;
+            height: 0;
+            margin-bottom: 1px;
+            margin-left: 2px;
+        }
+
+        /* ===== REMARK ===== */
+        .remark-row {
+            display: flex;
+            align-items: flex-end;
+        }
+
+        .remark-row .remark-label {
+            font-size: 6.5px;
+            font-weight: 700;
+            font-family: Arial, sans-serif;
+            padding-left: 5px;
+            min-width: 62px;
+            max-width: 62px;
+            flex-shrink: 0;
+            padding-right: 1px;
+            line-height: 1.5;
+        }
+
+        .remark-row .value-text {
+            flex: 1;
+            border-bottom: 0.8px solid #000;
+            font-size: 7px;
+            font-weight: 800;
+            color: #000;
+            text-transform: uppercase;
+            padding-bottom: 0px;
+            padding-left: 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            line-height: 1.5;
+        }
+
+        .remark-row .value-text-hi {
+            flex: 1;
+            border-bottom: 0.8px solid #000;
+            font-size: 7px;
+            font-weight: 800;
+            color: #000;
+            text-transform: none;
+            padding-bottom: 0px;
+            padding-left: 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            line-height: 1.5;
+        }
+
+        .remark-row .line {
+            flex: 1;
+            border-bottom: 0.8px solid #000;
+            height: 0;
+            margin-bottom: 1px;
+            margin-left: 2px;
+        }
+
+        .remark-extra {
+            border-bottom: 0.8px solid #000;
+            height: 0;
+            margin-top: 4px;
+            margin-left: 5px;
+            margin-right: 0;
+        }
+
+        /* ===== FOOTER (default — no change) ===== */
+        .footer-row {
+            display: flex;
+            border-top: 2.5px solid #000;
+            flex-shrink: 0;
+        }
+
+        .footer-cell {
+            padding: 2px 4px;
+            font-size: 7px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        .footer-left {
+            border-right: 2px solid #000;
+            min-width: 20px;
+            max-width: 75px;
+            font-size: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .footer-middle {
+            border-right: 2px solid #000;
+            padding: 2px 4px;
+            font-size: 7px;
+        }
+
+        .footer-middle .fbullet {
+            width: 3px;
+            height: 3px;
+            background: #000;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 3px;
+        }
+
+        .footer-right {
+            flex: 1;
+            justify-content: center;
+            font-size: 6px;
+            color: #666;
+        }
+
+        /* ══════════════════════════════════════
+           EMPTY CARD
+           ══════════════════════════════════════ */
+        .card-empty .form-box {
+            border: 2px dashed #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card-empty .empty-label {
+            font-size: 10px;
+            color: #ccc;
+            font-weight: 700;
+        }
+
+        /* ══════════════════════════════════════
+           PRINT BAR
+           ══════════════════════════════════════ */
+        .print-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(15, 23, 42, 0.96);
+            backdrop-filter: blur(12px);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            z-index: 9999;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .print-bar-info {
+            font-size: 12px;
+            color: rgba(255,255,255,0.6);
+        }
+
+        .print-bar-info strong {
+            color: #fff;
+            font-weight: 700;
+        }
+
+        .print-btn {
+            padding: 10px 28px;
+            border-radius: 14px;
+            background: #fff;
+            color: #0f172a;
+            font-size: 13px;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.12s;
+        }
+
+        .print-btn:hover { transform: scale(1.02); }
+        .print-btn:active { transform: scale(0.98); }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: rgba(255,255,255,0.8);
+        }
+
+        .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+
+        .empty-state h2 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 6px;
+        }
+
+        .empty-state p {
+            font-size: 12px;
+            color: rgba(255,255,255,0.5);
+            max-width: 340px;
+            margin: 0 auto;
+            line-height: 1.5;
+        }
+
+        @media print {
+            body {
+                background: #fff;
+                padding: 0;
+                margin: 0;
+            }
+
+            .screen-header,
+            .print-bar {
+                display: none !important;
+            }
+
+            .a4-page {
+                margin: 0;
+                box-shadow: none;
+                border-radius: 0;
+            }
+
+            .card-empty .form-box { border-color: #ddd; }
+            .card-empty .empty-label { color: #eee; }
+        }
+
+        @media screen and (max-width: 800px) {
+            body { padding: 10px 6px 80px 6px; }
+
+            .a4-page {
+                width: 100%;
+                height: auto;
+                min-height: auto;
+                padding: 6px;
+                gap: 6px;
+                border-radius: 12px;
+            }
+
+            .card .form-box { border-width: 2px; }
+            .header-cell { font-size: 8px; }
+            .cell-gender { font-size: 12px; }
+            .form-row .label-text { font-size: 6px; min-width: 52px; max-width: 52px; }
+            .form-row .value-text,
+            .form-row .value-text-hi { font-size: 6px; }
+            .remark-row .remark-label { font-size: 6px; min-width: 52px; max-width: 52px; }
+            .remark-row .value-text,
+            .remark-row .value-text-hi { font-size: 6px; }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="screen-header">
+        <h1 id="pageTitle">🎫 Token Print</h1>
+        <p id="pageSub">Tokens will appear here</p>
+    </div>
+
+    <div id="pagesContainer"></div>
+
+    <div id="emptyState" class="empty-state" style="display:none;">
+        <div class="icon">📭</div>
+        <h2>No Tokens</h2>
+        <p>This template is used by the app to generate token cards. Open it from the container panel using the 🎫 button.</p>
+    </div>
+
+    <div class="print-bar" id="printBar" style="display:none;">
+        <div class="print-bar-info">
+            🎫 <strong id="tokenCount">0</strong> tokens •
+            📄 <strong id="pageCount">0</strong> pages (A4) •
+            🌳 Paper saved!
+        </div>
+        <button class="print-btn" onclick="window.print()">🖨 Print Tokens</button>
+    </div>
+
+    <script>
+        var CARDS_PER_PAGE = 8;
+
+        function esc(str) {
+            if (!str) return "";
+            var d = document.createElement("div");
+            d.textContent = String(str);
+            return d.innerHTML;
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return "—";
+            var p = String(dateStr).split("-");
+            if (p.length === 3) return p[2] + "/" + p[1] + "/" + p[0];
+            return dateStr;
+        }
+
+        function genderLetter(gender) {
+            if (!gender) return "?";
+            var g = String(gender).toUpperCase();
+            if (g === "MALE") return "M";
+            if (g === "FEMALE") return "F";
+            return "O";
+        }
+
+        /* Detect Hindi/Devanagari characters */
+        function isHindi(str) {
+            if (!str) return false;
+            return /[\u0900-\u097F]/.test(str);
+        }
+
+        /* Boolean + note → "हाँ — note" or "नहीं" */
+        function boolNote(boolVal, noteVal) {
+            var parts = [];
+            if (boolVal === true) parts.push("हाँ");
+            else if (boolVal === false) parts.push("नहीं");
+            if (noteVal && String(noteVal).trim()) parts.push(String(noteVal).trim());
+            return parts.join(" — ");
+        }
+
+        /*
+         * Form row — clean colon style:
+         * • नाम और उम्र :  OGGY (25)
+         *                   ___________
+         * 
+         * Label has colon built-in
+         * No vertical separator bar
+         * Hindi: line-height 1.5, no clipping
+         */
+        function formRow(label, value) {
+            var v = value ? String(value).trim() : "";
+            var valueHtml;
+
+            if (v) {
+                if (isHindi(v)) {
+                    valueHtml = '<span class="value-text-hi">' + esc(v) + '</span>';
+                } else {
+                    valueHtml = '<span class="value-text">' + esc(v) + '</span>';
+                }
+            } else {
+                valueHtml = '<div class="line"></div>';
+            }
+
+            return '<div class="form-row">' +
+                '<div class="bullet"></div>' +
+                '<span class="label-text">' + esc(label) + ' :</span>' +
+                valueHtml +
+                '</div>';
+        }
+
+        /* Remark row — same clean style */
+        function remarkRow(label, value) {
+            var v = value ? String(value).trim() : "";
+            var valueHtml;
+
+            if (v) {
+                if (isHindi(v)) {
+                    valueHtml = '<span class="value-text-hi">' + esc(v) + '</span>';
+                } else {
+                    valueHtml = '<span class="value-text">' + esc(v) + '</span>';
+                }
+            } else {
+                valueHtml = '<div class="line"></div>';
+            }
+
+            return '<div class="remark-row">' +
+                '<span class="remark-label">' + esc(label) + ' :</span>' +
+                valueHtml +
+                '</div>';
+        }
+
+        /*
+         * ══════════════════════════════════════
+         * BUILD TOKEN CARD
+         *
+         * Clean layout:
+         * ┌────────────────────────────────────┐
+         * │ F │   Date : 18/02/2026  │ T: 1   │
+         * ├────────────────────────────────────┤
+         * │ • नाम और उम्र :     OGGY (25)     │
+         * │ • कहाँ से :          WASHINGTON     │
+         * │ • सत्संग श्रवण :     2022          │
+         * │ • वृन्दावन कितनी बार : 65           │
+         * │ • दीक्षा प्रथम :     20-04-23      │
+         * │ • क्या करते हैं :     COMAND        │
+         * │ • नशा इत्यादि :      नहीं          │
+         * │ • पालतू जानवर :       नहीं          │
+         * │ • पूर्व में दीक्षा :   नहीं          │
+         * │ • पारिवारिक सहमति :   FATHER        │
+         * │   Remark :          IFXIGXIG...    │
+         * │   ________________________________ │
+         * ├────────────────────────────────────┤
+         * │ approver │• remarksBy │ sign____   │
+         * └────────────────────────────────────┘
+         * ══════════════════════════════════════
+         */
+        function buildCard(item, mode, date) {
+            var c = item.customer || {};
+            var seq = item.sequenceNo || 0;
+
+            var headerLetter = genderLetter(c.gender);
+            var nameAge = (c.name || "") + (c.age ? " (" + c.age + ")" : "");
+            var kahanSe = c.address || "";
+            var satsang = c.dikshaYear || "";
+            var vrindavan = c.vrindavanVisits || "";
+            var firstDiksha = c.firstDikshaYear || "";
+            var occup = c.occupation || "";
+            var nashaVal = boolNote(c.nasha, c.nashaNote);
+            var petVal = boolNote(c.hasPet, c.petNote);
+            var guruVal = boolNote(c.hadTeacherBefore, c.guruNote);
+            var familyVal = c.familyPermissionRelation || "";
+            var remarkVal = c.note || "";
+            var approverVal = c.approver || "";
+            var remarksByVal = c.remarksBy || "";
+
+            return '<div class="card"><div class="form-box">' +
+
+                /* HEADER */
+                '<div class="header-row">' +
+                '<div class="header-cell cell-gender">' + esc(headerLetter) + '</div>' +
+                '<div class="header-cell cell-date">Date : ' + esc(formatDate(date)) + '</div>' +
+                '<div class="header-cell cell-token">Token no: ' + seq + '</div>' +
+                '</div>' +
+
+                /* BODY */
+                '<div class="form-body">' +
+                formRow("नाम और उम्र", nameAge) +
+                formRow("कहाँ से", kahanSe) +
+                formRow("सत्संग श्रवण", satsang) +
+                formRow("वृन्दावन कितनी बार", vrindavan) +
+                formRow("दीक्षा प्रथम उपस्थिति", firstDiksha) +
+                formRow("क्या करते हैं", occup) +
+                formRow("नशा इत्यादि", nashaVal) +
+                formRow("पालतू जानवर", petVal) +
+                formRow("पूर्व में दीक्षा", guruVal) +
+                formRow("पारिवारिक सहमति", familyVal) +
+
+                /* REMARK */
+                remarkRow("Remark", remarkVal) +
+                '<div class="remark-extra"></div>' +
+                '</div>' +
+
+                /* FOOTER (default) */
+                '<div class="footer-row">' +
+                '<div class="footer-cell footer-left">' +
+                (approverVal ? esc(approverVal) : '&nbsp;') +
+                '</div>' +
+                '<div class="footer-cell footer-middle">' +
+                '<span class="fbullet"></span> ' + esc(remarksByVal || "—") +
+                '</div>' +
+                '<div class="footer-cell footer-right">' +
+                'sign ___________' +
+                '</div>' +
+                '</div>' +
+
+                '</div></div>';
+        }
+
+        function buildEmptyCard() {
+            return '<div class="card card-empty"><div class="form-box">' +
+                '<span class="empty-label">✂ — — —</span>' +
+                '</div></div>';
+        }
+
+        /* ══════════════════════════════════════
+           MAIN INJECTION
+           ══════════════════════════════════════ */
+        window.__INJECT_TOKENS__ = function(data) {
+            var title = (data && data.title) || "Token Print";
+            var date = (data && data.date) || "";
+            var mode = (data && data.mode) || "MEETING";
+            var items = (data && data.items) || [];
+
+            document.getElementById("pageTitle").textContent = "🎫 " + title;
+            document.getElementById("pageSub").textContent =
+                items.length + " tokens • 8 per page • Generated: " + new Date().toLocaleString();
+
+            if (items.length === 0) {
+                document.getElementById("emptyState").style.display = "block";
+                document.getElementById("printBar").style.display = "none";
+                document.getElementById("pagesContainer").innerHTML = "";
+                return;
+            }
+
+            var pages = [];
+            for (var i = 0; i < items.length; i += CARDS_PER_PAGE) {
+                pages.push(items.slice(i, i + CARDS_PER_PAGE));
+            }
+
+            var pagesHtml = "";
+            for (var p = 0; p < pages.length; p++) {
+                var pageItems = pages[p];
+                var cardsHtml = "";
+                for (var j = 0; j < CARDS_PER_PAGE; j++) {
+                    if (j < pageItems.length) {
+                        cardsHtml += buildCard(pageItems[j], mode, date);
+                    } else {
+                        cardsHtml += buildEmptyCard();
+                    }
+                }
+                pagesHtml += '<div class="a4-page">' + cardsHtml + '</div>';
+            }
+
+            document.getElementById("pagesContainer").innerHTML = pagesHtml;
+            document.getElementById("emptyState").style.display = "none";
+            document.getElementById("printBar").style.display = "flex";
+            document.getElementById("tokenCount").textContent = items.length;
+            document.getElementById("pageCount").textContent = pages.length;
+        };
+
+        window.addEventListener("DOMContentLoaded", function() {
+            setTimeout(function() {
+                var container = document.getElementById("pagesContainer");
+                if (!container.innerHTML.trim()) {
+                    document.getElementById("emptyState").style.display = "block";
+                }
+            }, 800);
+        });
+    </script>
+
+</body>
+</html>

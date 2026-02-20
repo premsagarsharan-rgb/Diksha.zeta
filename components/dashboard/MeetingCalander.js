@@ -9,6 +9,7 @@ import DikshaOccupyPickerModal from "@/components/dashboard/DikshaOccupyPickerMo
 import BufferSpinner from "@/components/BufferSpinner";
 import { openForm2PrintAllPreview } from "@/lib/printForm2Client";
 import { openContainerListPrintPreview } from "@/lib/printListClient";
+import { openTokenPrintPreview } from "@/lib/printTokenClient";
 import { useTheme } from "@/components/ThemeProvider";
 import { useCT, getModeStyle, getLockStatus } from "./calander/calanderTheme";
 
@@ -24,7 +25,6 @@ import { ChangeDateModal } from "./calander/changeDate";
 
 const MODE = "MEETING";
 
-/* ── Utility ── */
 function ymdLocal(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -51,9 +51,7 @@ function safeId(x) {
 }
 
 function countGenders(list) {
-  let male = 0,
-    female = 0,
-    other = 0;
+  let male = 0, female = 0, other = 0;
   for (const a of list || []) {
     const g = a?.customer?.gender;
     if (g === "MALE") male++;
@@ -69,24 +67,18 @@ export default function MeetingCalander({ role }) {
   const c = useCT(isLight);
   const ms = getModeStyle(MODE, c);
 
-  /* ── Calendar Nav ── */
   const [calOpen, setCalOpen] = useState(false);
   const [anchor, setAnchor] = useState(new Date());
-
   const year = anchor.getFullYear();
   const month = anchor.getMonth();
   const cells = useMemo(() => monthCells(year, month), [year, month]);
   const daysInThisMonth = useMemo(() => new Date(year, month + 1, 0).getDate(), [year, month]);
-  const monthDays = useMemo(
-    () => Array.from({ length: daysInThisMonth }, (_, i) => new Date(year, month, i + 1)),
-    [daysInThisMonth, year, month]
-  );
+  const monthDays = useMemo(() => Array.from({ length: daysInThisMonth }, (_, i) => new Date(year, month, i + 1)), [daysInThisMonth, year, month]);
 
   const [selectedDate, setSelectedDate] = useState(null);
   const [summary, setSummary] = useState({});
   const todayStr = useMemo(() => ymdLocal(new Date()), []);
 
-  /* ── Container ── */
   const [containerOpen, setContainerOpen] = useState(false);
   const [container, setContainer] = useState(null);
   const [assignments, setAssignments] = useState([]);
@@ -96,92 +88,61 @@ export default function MeetingCalander({ role }) {
   const [housefull, setHousefull] = useState(false);
   const [containerLoading, setContainerLoading] = useState(false);
 
-  /* ── Add Customer ── */
   const [addOpen, setAddOpen] = useState(false);
   const [sittingActive, setSittingActive] = useState([]);
   const [pickMode, setPickMode] = useState("SINGLE");
   const [selectedIds, setSelectedIds] = useState([]);
   const [pushing, setPushing] = useState(false);
 
-  /* ── Single/Family Confirm ── */
   const [confirmSingleOpen, setConfirmSingleOpen] = useState(false);
   const [confirmFamilyOpen, setConfirmFamilyOpen] = useState(false);
   const [singleTargetId, setSingleTargetId] = useState(null);
 
-  /* ── Profile ── */
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileCustomer, setProfileCustomer] = useState(null);
   const [profileSeqNo, setProfileSeqNo] = useState(null);
   const [profileCtx, setProfileCtx] = useState(null);
 
-  /* ── Occupy Picker ── */
   const [occupyOpen, setOccupyOpen] = useState(false);
   const [occupyCtx, setOccupyCtx] = useState(null);
 
-  /* ── Reject ── */
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectTarget, setRejectTarget] = useState(null);
   const [rejectTargetSeq, setRejectTargetSeq] = useState(null);
 
-  /* ── Confirm Diksha ── */
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [confirmModalTarget, setConfirmModalTarget] = useState(null);
 
-  /* ── Change Date ── */
   const [changeDateOpen, setChangeDateOpen] = useState(false);
   const [changeDateAssignment, setChangeDateAssignment] = useState(null);
   const [changeDateGroupMembers, setChangeDateGroupMembers] = useState([]);
 
-  /* ── Warning ── */
   const [warnOpen, setWarnOpen] = useState(false);
   const [warnTitle, setWarnTitle] = useState("Warning");
   const [warnMsg, setWarnMsg] = useState("");
-  function showWarn(title, msg) {
-    setWarnTitle(String(title || "Warning"));
-    setWarnMsg(String(msg || ""));
-    setWarnOpen(true);
-  }
+  function showWarn(title, msg) { setWarnTitle(String(title || "Warning")); setWarnMsg(String(msg || "")); setWarnOpen(true); }
 
   const { requestCommit, CommitModal } = useCommitGate({
     defaultSuggestions: [
-      "Assigned customer to container",
-      "Couple assigned",
-      "Family assigned",
-      "Out from container",
-      "Meeting reserved (occupy)",
-      "Meeting confirm → Diksha",
-      "Meeting reject → Pending",
-      "Meeting reject → Trash",
-      "Meeting reject → ApproveFor",
+      "Assigned customer to container", "Couple assigned", "Family assigned", "Out from container",
+      "Meeting reserved (occupy)", "Meeting confirm → Diksha", "Meeting reject → Pending",
+      "Meeting reject → Trash", "Meeting reject → ApproveFor",
       "⚡ BYPASS — Skip Diksha, send to Pending after confirm",
-      "Card moved to different date",
-      "Meeting date changed — schedule adjustment",
-      "Occupied date changed",
-      "Card moved — customer request",
+      "Card moved to different date", "Meeting date changed — schedule adjustment",
+      "Occupied date changed", "Card moved — customer request",
     ],
   });
 
-  /* ── Error Handler ── */
   function handleApiError(data, fallback = "Failed") {
     if (!data?.error) return showWarn("Error", fallback);
-    if (data.error === "HOUSEFULL") {
-      setHousefull(true);
-      return;
-    }
-    if (data.error === "NOT_ELIGIBLE_FOR_DIKSHA")
-      return showWarn(
-        "Not Eligible",
-        "Pehle Meeting me Confirm karo ya Reject→Pending flow se eligible banao."
-      );
-    if (data.error === "OCCUPY_REQUIRED")
-      return showWarn("Occupy Required", "Meeting push ke liye Occupy (Diksha date) required hai.");
+    if (data.error === "HOUSEFULL") { setHousefull(true); return; }
+    if (data.error === "NOT_ELIGIBLE_FOR_DIKSHA") return showWarn("Not Eligible", "Pehle Meeting me Confirm karo ya Reject→Pending flow se eligible banao.");
+    if (data.error === "OCCUPY_REQUIRED") return showWarn("Occupy Required", "Meeting push ke liye Occupy (Diksha date) required hai.");
     if (data.error === "LOCKED_QUALIFIED") return showWarn("Locked", "Card QUALIFIED ho chuka hai.");
-    if (data.error === "OCCUPY_MUST_BE_AFTER_MEETING")
-      return showWarn("Invalid Occupy Date", data.message || "Occupy date must be AFTER meeting date.");
+    if (data.error === "OCCUPY_MUST_BE_AFTER_MEETING") return showWarn("Invalid Occupy Date", data.message || "Occupy date must be AFTER meeting date.");
     return showWarn("Error", data.error || fallback);
   }
 
-  /* ── Summary ── */
   async function loadSummary() {
     try {
       const from = ymdLocal(new Date(year, month, 1));
@@ -189,33 +150,18 @@ export default function MeetingCalander({ role }) {
       const res = await fetch(`/api/calander/summary?from=${from}&to=${to}&mode=${MODE}`);
       const data = await res.json().catch(() => ({}));
       setSummary(data.map || {});
-    } catch (e) {
-      console.error("loadSummary failed", e);
-      setSummary({});
-    }
+    } catch (e) { console.error("loadSummary failed", e); setSummary({}); }
   }
 
-  useEffect(() => {
-    loadSummary();
-  }, [year, month]);
+  useEffect(() => { loadSummary(); }, [year, month]);
 
-  function isDesktopNow() {
-    if (typeof window === "undefined") return true;
-    return window.matchMedia("(min-width: 768px)").matches;
-  }
+  function isDesktopNow() { if (typeof window === "undefined") return true; return window.matchMedia("(min-width: 768px)").matches; }
 
-  /* ── Container Load ── */
   async function openContainerForDate(dateStr, opts = {}) {
     const shouldOpenLayer = typeof opts.openLayer === "boolean" ? opts.openLayer : isDesktopNow();
-    setHousefull(false);
-    setSelectedDate(dateStr);
-    setContainerLoading(true);
+    setHousefull(false); setSelectedDate(dateStr); setContainerLoading(true);
     try {
-      const cRes = await fetch("/api/calander/container/by-date", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: dateStr, mode: MODE }),
-      });
+      const cRes = await fetch("/api/calander/container/by-date", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: dateStr, mode: MODE }) });
       const raw = await cRes.json().catch(() => ({}));
       if (!cRes.ok) return handleApiError(raw, "Container failed");
       const containerObj = raw?.container?.value ?? raw?.container;
@@ -224,460 +170,208 @@ export default function MeetingCalander({ role }) {
       const dRes = await fetch(`/api/calander/container/${id}?includeReserved=1&includeHistory=1`);
       const dData = await dRes.json().catch(() => ({}));
       if (!dRes.ok) return handleApiError(dData, "Load failed");
-      setContainer(dData.container);
-      setAssignments(dData.assignments || []);
-      setReserved(dData.reserved || []);
-      setHistoryRecords(dData.history || []);
-      setShowList(true);
-      setContainerOpen(shouldOpenLayer);
-    } finally {
-      setContainerLoading(false);
-    }
+      setContainer(dData.container); setAssignments(dData.assignments || []); setReserved(dData.reserved || []); setHistoryRecords(dData.history || []);
+      setShowList(true); setContainerOpen(shouldOpenLayer);
+    } finally { setContainerLoading(false); }
   }
 
   async function refreshContainer() {
     if (!container?._id) return;
-    const id = safeId(container._id);
-    if (!id) return;
+    const id = safeId(container._id); if (!id) return;
     const dRes = await fetch(`/api/calander/container/${id}?includeReserved=1&includeHistory=1`);
     const dData = await dRes.json().catch(() => ({}));
     if (!dRes.ok) return;
-    setContainer(dData.container);
-    setAssignments(dData.assignments || []);
-    setReserved(dData.reserved || []);
-    setHistoryRecords(dData.history || []);
+    setContainer(dData.container); setAssignments(dData.assignments || []); setReserved(dData.reserved || []); setHistoryRecords(dData.history || []);
   }
 
-  /* ─────────────────────────────────────────────
-     ✅ P2-3 NEW: When History "Diksha date ↗" clicked
-     Close Meeting modals so Diksha modal is visible.
-     Event: CALANDER_OPEN_DIKSHA_DATE { detail: { date } }
-     ───────────────────────────────────────────── */
   useEffect(() => {
     if (typeof window === "undefined") return;
-
     function onOpenDiksha(ev) {
       const dateStr = ev?.detail?.date;
-      if (typeof dateStr !== "string") return;
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
-
-      // Close all Meeting UI layers to avoid modal stacking issues
-      setConfirmModalOpen(false);
-      setConfirmModalTarget(null);
-
-      setRejectOpen(false);
-      setRejectTarget(null);
-      setRejectTargetSeq(null);
-
-      setAddOpen(false);
-      setConfirmSingleOpen(false);
-      setConfirmFamilyOpen(false);
-
-      setOccupyOpen(false);
-      setOccupyCtx(null);
-
-      setChangeDateOpen(false);
-      setChangeDateAssignment(null);
-      setChangeDateGroupMembers([]);
-
-      setProfileOpen(false);
-      setProfileCustomer(null);
-      setProfileCtx(null);
-      setProfileSeqNo(null);
-
-      // Close container + calendar (so Diksha calendar can show clearly)
-      setContainerOpen(false);
-      setCalOpen(false);
-
-      // Optional: clear container state (safe)
-      setContainer(null);
-      setAssignments([]);
-      setReserved([]);
-      setHistoryRecords([]);
-      setSelectedDate(null);
-      setHousefull(false);
+      if (typeof dateStr !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
+      setConfirmModalOpen(false); setConfirmModalTarget(null); setRejectOpen(false); setRejectTarget(null); setRejectTargetSeq(null);
+      setAddOpen(false); setConfirmSingleOpen(false); setConfirmFamilyOpen(false); setOccupyOpen(false); setOccupyCtx(null);
+      setChangeDateOpen(false); setChangeDateAssignment(null); setChangeDateGroupMembers([]);
+      setProfileOpen(false); setProfileCustomer(null); setProfileCtx(null); setProfileSeqNo(null);
+      setContainerOpen(false); setCalOpen(false); setContainer(null); setAssignments([]); setReserved([]); setHistoryRecords([]); setSelectedDate(null); setHousefull(false);
     }
-
     window.addEventListener("CALANDER_OPEN_DIKSHA_DATE", onOpenDiksha);
     return () => window.removeEventListener("CALANDER_OPEN_DIKSHA_DATE", onOpenDiksha);
   }, []);
 
-  /* ── Add Customer ── */
   async function openAddCustomerLayer() {
-    setHousefull(false);
-    setPickMode("SINGLE");
-    setSelectedIds([]);
-    setSingleTargetId(null);
-    setConfirmSingleOpen(false);
-    setConfirmFamilyOpen(false);
-    setAddOpen(true);
+    setHousefull(false); setPickMode("SINGLE"); setSelectedIds([]); setSingleTargetId(null);
+    setConfirmSingleOpen(false); setConfirmFamilyOpen(false); setAddOpen(true);
     const sitRes = await fetch("/api/customers/sitting");
     const sitData = await sitRes.json().catch(() => ({}));
     if (!sitRes.ok) return handleApiError(sitData, "Failed to load sitting customers");
     setSittingActive((sitData.items || []).filter((cc) => cc.status === "ACTIVE"));
   }
 
-  function initiateSingleAssign(customerId) {
-    setSingleTargetId(customerId);
-    setConfirmSingleOpen(true);
-  }
+  function initiateSingleAssign(customerId) { setSingleTargetId(customerId); setConfirmSingleOpen(true); }
 
-  /* ── confirmSinglePush — BYPASS AWARE ── */
   async function confirmSinglePush({ occupyDate } = {}) {
     if (!container?._id || !singleTargetId) return;
     const isBypass = occupyDate === "BYPASS";
-
-    if (!occupyDate) {
-      setOccupyCtx({ type: "SINGLE", customerId: singleTargetId, groupSize: 1 });
-      setOccupyOpen(true);
-      return;
-    }
-
-    const commitMessage = await requestCommit({
-      title: isBypass ? "⚡ BYPASS — Assign without Diksha" : "Meeting Assign + Occupy",
-      subtitle: isBypass ? "Card → Pending after confirm. No Diksha slot." : `Occupy Diksha: ${occupyDate}`,
-      preset: isBypass ? "⚡ BYPASS — Skip Diksha, send to Pending after confirm" : "Meeting reserved (occupy)",
-    }).catch(() => null);
+    if (!occupyDate) { setOccupyCtx({ type: "SINGLE", customerId: singleTargetId, groupSize: 1 }); setOccupyOpen(true); return; }
+    const commitMessage = await requestCommit({ title: isBypass ? "⚡ BYPASS — Assign without Diksha" : "Meeting Assign + Occupy", subtitle: isBypass ? "Card → Pending after confirm." : `Occupy Diksha: ${occupyDate}`, preset: isBypass ? "⚡ BYPASS — Skip Diksha, send to Pending after confirm" : "Meeting reserved (occupy)" }).catch(() => null);
     if (!commitMessage) return;
-
-    const cId = safeId(container._id);
-    if (!cId) return;
-
+    const cId = safeId(container._id); if (!cId) return;
     setPushing(true);
     try {
-      const body = {
-        customerId: singleTargetId,
-        source: "SITTING",
-        note: isBypass ? "BYPASS: Diksha skipped" : "",
-        commitMessage,
-        bypass: isBypass || undefined,
-      };
+      const body = { customerId: singleTargetId, source: "SITTING", note: isBypass ? "BYPASS: Diksha skipped" : "", commitMessage, bypass: isBypass || undefined };
       if (!isBypass) body.occupyDate = occupyDate;
-
-      const res = await fetch(`/api/calander/container/${cId}/assign`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const res = await fetch(`/api/calander/container/${cId}/assign`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return handleApiError(data, "Assign failed");
-      await refreshContainer();
-      await loadSummary();
-      setConfirmSingleOpen(false);
-      setAddOpen(false);
-    } finally {
-      setPushing(false);
-    }
+      await refreshContainer(); await loadSummary(); setConfirmSingleOpen(false); setAddOpen(false);
+    } finally { setPushing(false); }
   }
 
-  function initiateFamilyAssign() {
-    if (selectedIds.length < 2) return showWarn("Select Customers", "Minimum 2 required");
-    setConfirmFamilyOpen(true);
-  }
+  function initiateFamilyAssign() { if (selectedIds.length < 2) return showWarn("Select Customers", "Minimum 2 required"); setConfirmFamilyOpen(true); }
 
-  /* ── confirmFamilyPush — BYPASS AWARE ── */
   async function confirmFamilyPush({ occupyDate } = {}) {
     if (!container?._id) return;
     const ids = selectedIds.map(safeId).filter(Boolean);
     if (ids.length < 2) return showWarn("Select Customers", "Minimum 2 required");
-
     const isBypass = occupyDate === "BYPASS";
-    if (!occupyDate) {
-      setOccupyCtx({ type: "FAMILY", customerIds: ids, groupSize: ids.length });
-      setOccupyOpen(true);
-      return;
-    }
-
+    if (!occupyDate) { setOccupyCtx({ type: "FAMILY", customerIds: ids, groupSize: ids.length }); setOccupyOpen(true); return; }
     const isCouple = ids.length === 2;
-    const commitMessage = await requestCommit({
-      title: isBypass ? `⚡ BYPASS — ${isCouple ? "Couple" : "Family"} without Diksha` : "Meeting Group + Occupy",
-      subtitle: isBypass ? "Group → Pending after confirm." : `Occupy Diksha: ${occupyDate}`,
-      preset: isBypass ? "⚡ BYPASS — Skip Diksha, send to Pending after confirm" : "Meeting reserved (occupy)",
-    }).catch(() => null);
+    const commitMessage = await requestCommit({ title: isBypass ? `⚡ BYPASS — ${isCouple ? "Couple" : "Family"} without Diksha` : "Meeting Group + Occupy", subtitle: isBypass ? "Group → Pending after confirm." : `Occupy Diksha: ${occupyDate}`, preset: isBypass ? "⚡ BYPASS — Skip Diksha, send to Pending after confirm" : "Meeting reserved (occupy)" }).catch(() => null);
     if (!commitMessage) return;
-
-    const cId = safeId(container._id);
-    if (!cId) return;
-
+    const cId = safeId(container._id); if (!cId) return;
     setPushing(true);
     try {
-      const body = {
-        customerIds: ids,
-        note: isBypass ? "BYPASS: Diksha skipped" : "",
-        commitMessage,
-        bypass: isBypass || undefined,
-      };
+      const body = { customerIds: ids, note: isBypass ? "BYPASS: Diksha skipped" : "", commitMessage, bypass: isBypass || undefined };
       if (!isBypass) body.occupyDate = occupyDate;
-
-      const res = await fetch(`/api/calander/container/${cId}/assign-couple`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const res = await fetch(`/api/calander/container/${cId}/assign-couple`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return handleApiError(data, "Family assign failed");
-      await refreshContainer();
-      await loadSummary();
-      setConfirmFamilyOpen(false);
-      setAddOpen(false);
-    } finally {
-      setPushing(false);
-    }
+      await refreshContainer(); await loadSummary(); setConfirmFamilyOpen(false); setAddOpen(false);
+    } finally { setPushing(false); }
   }
 
-  /* ── Confirm Meeting → Diksha ── */
-  function openConfirmModal(assignment) {
-    setConfirmModalTarget(assignment);
-    setConfirmModalOpen(true);
-  }
+  function openConfirmModal(assignment) { setConfirmModalTarget(assignment); setConfirmModalOpen(true); }
 
   async function confirmMeetingCard(assignment) {
-    const cId = safeId(container?._id);
-    const aId = safeId(assignment?._id);
+    const cId = safeId(container?._id); const aId = safeId(assignment?._id);
     if (!cId || !aId) return;
-
     const isBypass = assignment?.bypass === true || assignment?.occupiedDate === "BYPASS";
-
-    const commitMessage = await requestCommit({
-      title: isBypass ? "⚡ BYPASS Confirm → Pending" : "Confirm → Move to Diksha",
-      subtitle: isBypass ? "Card → Pending (BYPASS)" : `Occupied: ${assignment.occupiedDate || "—"}`,
-      preset: isBypass ? "⚡ BYPASS — Skip Diksha, send to Pending after confirm" : "Meeting confirm → Diksha",
-    }).catch(() => null);
+    const commitMessage = await requestCommit({ title: isBypass ? "⚡ BYPASS Confirm → Pending" : "Confirm → Move to Diksha", subtitle: isBypass ? "Card → Pending (BYPASS)" : `Occupied: ${assignment.occupiedDate || "—"}`, preset: isBypass ? "⚡ BYPASS — Skip Diksha, send to Pending after confirm" : "Meeting confirm → Diksha" }).catch(() => null);
     if (!commitMessage) return;
-
     setPushing(true);
     try {
-      const res = await fetch(`/api/calander/container/${cId}/assignments/${aId}/confirm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commitMessage }),
-      });
+      const res = await fetch(`/api/calander/container/${cId}/assignments/${aId}/confirm`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ commitMessage }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return handleApiError(data, "Confirm failed");
-      setConfirmModalOpen(false);
-      setConfirmModalTarget(null);
-      await refreshContainer();
-      await loadSummary();
-    } finally {
-      setPushing(false);
-    }
+      setConfirmModalOpen(false); setConfirmModalTarget(null); await refreshContainer(); await loadSummary();
+    } finally { setPushing(false); }
   }
 
-  /* ── Reject ── */
   async function rejectToTrash(assignment) {
-    const cId = safeId(container?._id);
-    const aId = safeId(assignment?._id);
+    const cId = safeId(container?._id); const aId = safeId(assignment?._id);
     if (!cId || !aId) return;
     const commitMessage = await requestCommit({ title: "Reject → Trash", preset: "Meeting reject → Trash" }).catch(() => null);
     if (!commitMessage) return;
     setPushing(true);
     try {
-      const res = await fetch(`/api/calander/container/${cId}/assignments/${aId}/reject`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commitMessage, rejectAction: "TRASH" }),
-      });
+      const res = await fetch(`/api/calander/container/${cId}/assignments/${aId}/reject`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ commitMessage, rejectAction: "TRASH" }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return handleApiError(data, "Trash failed");
-      setRejectOpen(false);
-      setRejectTarget(null);
-      setRejectTargetSeq(null);
-      await refreshContainer();
-      await loadSummary();
-    } finally {
-      setPushing(false);
-    }
+      setRejectOpen(false); setRejectTarget(null); setRejectTargetSeq(null); await refreshContainer(); await loadSummary();
+    } finally { setPushing(false); }
   }
 
   async function rejectToPending(assignment) {
-    const cId = safeId(container?._id);
-    const aId = safeId(assignment?._id);
+    const cId = safeId(container?._id); const aId = safeId(assignment?._id);
     if (!cId || !aId) return;
     const commitMessage = await requestCommit({ title: "Reject → Pending", preset: "Meeting reject → Pending" }).catch(() => null);
     if (!commitMessage) return;
     setPushing(true);
     try {
-      const res = await fetch(`/api/calander/container/${cId}/assignments/${aId}/reject`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commitMessage, rejectAction: "PUSH_PENDING" }),
-      });
+      const res = await fetch(`/api/calander/container/${cId}/assignments/${aId}/reject`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ commitMessage, rejectAction: "PUSH_PENDING" }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return handleApiError(data, "Reject failed");
-      setRejectOpen(false);
-      setRejectTarget(null);
-      setRejectTargetSeq(null);
-      await refreshContainer();
-      await loadSummary();
-    } finally {
-      setPushing(false);
-    }
+      setRejectOpen(false); setRejectTarget(null); setRejectTargetSeq(null); await refreshContainer(); await loadSummary();
+    } finally { setPushing(false); }
   }
 
   function handleApproveFor(assignment, seq) {
     if (!assignment?.customer?._id) return;
     setRejectOpen(false);
-    setProfileCtx({
-      containerId: safeId(container?._id),
-      assignmentId: safeId(assignment._id),
-      initialApproveStep: "pickDate",
-    });
-    setProfileCustomer(assignment.customer);
-    setProfileSeqNo(seq || null);
-    setProfileOpen(true);
+    setProfileCtx({ containerId: safeId(container?._id), assignmentId: safeId(assignment._id), initialApproveStep: "pickDate" });
+    setProfileCustomer(assignment.customer); setProfileSeqNo(seq || null); setProfileOpen(true);
   }
 
-  /* ── Out ── */
   async function outAssignment(assignmentIdRaw) {
-    const cId = safeId(container?._id);
-    const aId = safeId(assignmentIdRaw);
+    const cId = safeId(container?._id); const aId = safeId(assignmentIdRaw);
     if (!cId || !aId) return;
     const commitMessage = await requestCommit({ title: "Out", preset: "Out from container" }).catch(() => null);
     if (!commitMessage) return;
-    const res = await fetch(`/api/calander/container/${cId}/assignments/${aId}/out`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ commitMessage }),
-    });
+    const res = await fetch(`/api/calander/container/${cId}/assignments/${aId}/out`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ commitMessage }) });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return handleApiError(data, "Out failed");
-    await refreshContainer();
-    await loadSummary();
+    await refreshContainer(); await loadSummary();
   }
 
-  /* ── Admin Limit ── */
   async function increaseLimit() {
     if (role !== "ADMIN") return showWarn("Not allowed", "Only Admin can increase limit.");
-    const cId = safeId(container?._id);
-    if (!cId) return;
-    const next = prompt("New limit?", String(container.limit || 20));
-    if (!next) return;
+    const cId = safeId(container?._id); if (!cId) return;
+    const next = prompt("New limit?", String(container.limit || 20)); if (!next) return;
     const limit = parseInt(next, 10);
     if (!Number.isFinite(limit) || limit < 1) return showWarn("Invalid", "Invalid limit");
-    const res = await fetch(`/api/calander/container/${cId}/limit`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ limit }),
-    });
+    const res = await fetch(`/api/calander/container/${cId}/limit`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ limit }) });
     if (!res.ok) return showWarn("Failed", "Limit update failed");
-    await refreshContainer();
-    await loadSummary();
+    await refreshContainer(); await loadSummary();
   }
 
-  /* ── Unlock Container ── */
   async function unlockContainer(minutes) {
-    const cId = safeId(container?._id);
-    if (!cId) return;
-    const res = await fetch(`/api/calander/container/${cId}/unlock`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ minutes }),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      return showWarn("Unlock Failed", data.error || "Could not unlock container");
-    }
+    const cId = safeId(container?._id); if (!cId) return;
+    const res = await fetch(`/api/calander/container/${cId}/unlock`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ minutes }) });
+    if (!res.ok) { const data = await res.json().catch(() => ({})); return showWarn("Unlock Failed", data.error || "Could not unlock container"); }
     await refreshContainer();
   }
 
-  /* ── Change Date ── */
   async function openChangeDateModal(assignment, seq) {
     if (!assignment?._id || !container?._id) return;
-
     const enriched = { ...assignment, _containerDate: container.date };
-
     let groupMembers = [enriched];
     if ((assignment.kind === "COUPLE" || assignment.kind === "FAMILY") && assignment.pairId) {
-      groupMembers = assignments
-        .filter(
-          (a) => a.pairId && String(a.pairId) === String(assignment.pairId) && a.status === "IN_CONTAINER"
-        )
-        .map((a) => ({ ...a, _containerDate: container.date }));
-
+      groupMembers = assignments.filter((a) => a.pairId && String(a.pairId) === String(assignment.pairId) && a.status === "IN_CONTAINER").map((a) => ({ ...a, _containerDate: container.date }));
       if (groupMembers.length === 0) groupMembers = [enriched];
     }
-
-    setChangeDateAssignment(enriched);
-    setChangeDateGroupMembers(groupMembers);
-    setChangeDateOpen(true);
+    setChangeDateAssignment(enriched); setChangeDateGroupMembers(groupMembers); setChangeDateOpen(true);
   }
 
   async function executeChangeDate(containerId, assignmentId, payload) {
     setPushing(true);
     try {
-      const res = await fetch(`/api/calander/container/${containerId}/assignments/${assignmentId}/change-date`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch(`/api/calander/container/${containerId}/assignments/${assignmentId}/change-date`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json().catch(() => ({}));
-
       if (!res.ok) {
-        if (data.error === "COOLDOWN_ACTIVE") {
-          showWarn("⏰ Cooldown Active", `Please wait ${data.remainingSec}s before moving again.`);
-          return;
-        }
-        if (data.error === "STALE_DATA") {
-          showWarn("🔄 Stale Data", "Card was modified by someone else. Refreshing...");
-          await refreshContainer();
-          await loadSummary();
-          return;
-        }
-        if (data.error === "RACE_CONDITION") {
-          showWarn("⚠️ Conflict", data.message || "Card was moved by another user.");
-          await refreshContainer();
-          await loadSummary();
-          return;
-        }
-        if (data.error === "TARGET_HOUSEFULL") {
-          showWarn("🚫 Target Full", data.message || "Target container is full.");
-          return;
-        }
-        if (data.error === "DATE_CROSSES_OCCUPIED") {
-          showWarn("❌ Invalid Date", data.message || "Date crosses occupied boundary.");
-          return;
-        }
-        if (data.error === "OCCUPY_BEFORE_MEETING") {
-          showWarn("❌ Invalid Date", data.message || "Occupied date must be after meeting date.");
-          return;
-        }
-        if (data.error === "LOCKED_QUALIFIED") {
-          showWarn("👑 Locked", "Card is QUALIFIED and cannot be moved.");
-          return;
-        }
-        if (data.error === "DIKSHA_HOUSEFULL") {
-          showWarn("🚫 Diksha Full", data.message || "Diksha container is full.");
-          return;
-        }
+        if (data.error === "COOLDOWN_ACTIVE") { showWarn("⏰ Cooldown Active", `Please wait ${data.remainingSec}s before moving again.`); return; }
+        if (data.error === "STALE_DATA") { showWarn("🔄 Stale Data", "Card was modified. Refreshing..."); await refreshContainer(); await loadSummary(); return; }
+        if (data.error === "RACE_CONDITION") { showWarn("⚠️ Conflict", data.message || "Card was moved by another user."); await refreshContainer(); await loadSummary(); return; }
+        if (data.error === "TARGET_HOUSEFULL") { showWarn("🚫 Target Full", data.message || "Target container is full."); return; }
+        if (data.error === "DATE_CROSSES_OCCUPIED") { showWarn("❌ Invalid Date", data.message || "Date crosses occupied boundary."); return; }
+        if (data.error === "OCCUPY_BEFORE_MEETING") { showWarn("❌ Invalid Date", data.message || "Occupied date must be after meeting date."); return; }
+        if (data.error === "LOCKED_QUALIFIED") { showWarn("👑 Locked", "Card is QUALIFIED and cannot be moved."); return; }
+        if (data.error === "DIKSHA_HOUSEFULL") { showWarn("🚫 Diksha Full", data.message || "Diksha container is full."); return; }
         return handleApiError(data, "Change date failed");
       }
-
-      setChangeDateOpen(false);
-      setChangeDateAssignment(null);
-      setChangeDateGroupMembers([]);
-      await refreshContainer();
-      await loadSummary();
-    } finally {
-      setPushing(false);
-    }
+      setChangeDateOpen(false); setChangeDateAssignment(null); setChangeDateGroupMembers([]);
+      await refreshContainer(); await loadSummary();
+    } finally { setPushing(false); }
   }
 
-  /* ── Profile ── */
-  function openProfile(customerObj, seqNo = null) {
-    if (!customerObj?._id) return;
-    setProfileCtx(null);
-    setProfileCustomer(customerObj);
-    setProfileSeqNo(seqNo);
-    setProfileOpen(true);
-  }
+  function openProfile(customerObj, seqNo = null) { if (!customerObj?._id) return; setProfileCtx(null); setProfileCustomer(customerObj); setProfileSeqNo(seqNo); setProfileOpen(true); }
 
-  /* ── Print ── */
   async function openPrintAllForContainer() {
     if (!container?._id) return showWarn("Error", "Container not ready");
     if (!assignments?.length) return showWarn("Error", "No customers");
-    const title = `${container.date} / MEETING`;
+    const ttl = `${container.date} / MEETING`;
     const items = assignments.map((a, idx) => ({ customer: a.customer || {}, form: a.customer || {}, sequenceNo: idx + 1 }));
-    await openForm2PrintAllPreview({ title, items, source: "SITTING" });
+    await openForm2PrintAllPreview({ title: ttl, items, source: "SITTING" });
   }
 
   async function openPrintListForContainer() {
@@ -686,280 +380,66 @@ export default function MeetingCalander({ role }) {
     await openContainerListPrintPreview({ title: `${container.date} / MEETING • List`, container, assignments, reserved });
   }
 
-  /* ── Derived ── */
+  async function openPrintTokenForContainer() {
+    if (!container?._id) return showWarn("Error", "Container not ready");
+    if (!assignments?.length) return showWarn("Error", "No customers to print tokens");
+    const tokenItems = assignments.map((a, idx) => ({
+      sequenceNo: idx + 1,
+      customer: a.customer || {},
+      kind: a.kind || "SINGLE",
+      occupiedDate: a.occupiedDate || null,
+      status: a.status || "IN_CONTAINER",
+    }));
+    await openTokenPrintPreview({
+      title: `${container.date} / MEETING • Tokens`,
+      date: container.date,
+      mode: MODE,
+      items: tokenItems,
+      container,
+    });
+  }
+
   const counts = countGenders(assignments);
   const reservedCounts = countGenders(reserved);
-  const targetSingle = useMemo(() => {
-    return singleTargetId ? sittingActive.find((cc) => safeId(cc._id) === singleTargetId) : null;
-  }, [singleTargetId, sittingActive]);
+  const targetSingle = useMemo(() => singleTargetId ? sittingActive.find((cc) => safeId(cc._id) === singleTargetId) : null, [singleTargetId, sittingActive]);
 
-  /* ── Mobile auto-open ── */
   useEffect(() => {
-    if (!calOpen) return;
-    if (typeof window === "undefined") return;
-    const mobile = !window.matchMedia("(min-width: 768px)").matches;
-    if (!mobile) return;
+    if (!calOpen || typeof window === "undefined") return;
+    const mobile = !window.matchMedia("(min-width: 768px)").matches; if (!mobile) return;
     const sameMonth = todayStr.slice(0, 7) === ymdLocal(anchor).slice(0, 7);
     const autoDate = selectedDate || (sameMonth ? todayStr : ymdLocal(new Date(year, month, 1)));
     openContainerForDate(autoDate, { openLayer: false });
   }, [calOpen, year, month]);
 
-  /* ══════════════════════════════════════
-     RENDER
-     ══════════════════════════════════════ */
   return (
     <div>
-      {/* ── Entry Button ── */}
-      <button
-        onClick={() => {
-          setAnchor(new Date());
-          setCalOpen(true);
-        }}
-        type="button"
-        style={{
-          padding: "12px 22px",
-          borderRadius: 20,
-          background: ms.bg,
-          border: `1px solid ${ms.border}`,
-          color: ms.text,
-          fontSize: 14,
-          fontWeight: 600,
-          cursor: "pointer",
-          transition: "all 0.15s",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
-        📋 Meeting Calendar
-      </button>
+      <button onClick={() => { setAnchor(new Date()); setCalOpen(true); }} type="button" style={{ padding: "12px 22px", borderRadius: 20, background: ms.bg, border: `1px solid ${ms.border}`, color: ms.text, fontSize: 14, fontWeight: 600, cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", gap: 8 }}>📋 Meeting Calendar</button>
 
-      {/* Warning */}
-      <LayerModal
-        open={warnOpen}
-        layerName="Warning"
-        title={warnTitle}
-        sub=""
-        onClose={() => setWarnOpen(false)}
-        maxWidth="max-w-md"
-      >
+      <LayerModal open={warnOpen} layerName="Warning" title={warnTitle} sub="" onClose={() => setWarnOpen(false)} maxWidth="max-w-md">
         <div style={{ borderRadius: 18, border: `1px solid ${c.surfaceBorder}`, background: c.surfaceBg, padding: 16 }}>
           <div style={{ fontSize: 13, color: c.t2, whiteSpace: "pre-wrap" }}>{warnMsg}</div>
-          <div style={{ marginTop: 16 }}>
-            <button
-              type="button"
-              onClick={() => setWarnOpen(false)}
-              style={{
-                width: "100%",
-                padding: "12px 16px",
-                borderRadius: 18,
-                background: c.btnSolidBg,
-                color: c.btnSolidText,
-                fontWeight: 600,
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              OK
-            </button>
-          </div>
+          <div style={{ marginTop: 16 }}><button type="button" onClick={() => setWarnOpen(false)} style={{ width: "100%", padding: "12px 16px", borderRadius: 18, background: c.btnSolidBg, color: c.btnSolidText, fontWeight: 600, border: "none", cursor: "pointer" }}>OK</button></div>
         </div>
       </LayerModal>
 
-      {/* Layer 1: Calendar */}
-      <LayerModal
-        open={calOpen}
-        layerName="Meeting"
-        title="📋 Meeting Calendar"
-        sub="Desktop: Monthly Grid • Mobile: Day Strip"
-        onClose={() => {
-          setCalOpen(false);
-          setContainerOpen(false);
-          setAddOpen(false);
-          setConfirmSingleOpen(false);
-          setConfirmFamilyOpen(false);
-          setChangeDateOpen(false);
-        }}
-        maxWidth="max-w-5xl"
-      >
-        <CalanderHeader
-          anchor={anchor}
-          mode={MODE}
-          onPrevMonth={() => setAnchor(new Date(year, month - 1, 1))}
-          onNextMonth={() => setAnchor(new Date(year, month + 1, 1))}
-        />
-
-        <CalanderMobileHero
-          container={container}
-          mode={MODE}
-          selectedDate={selectedDate}
-          todayStr={todayStr}
-          counts={counts}
-          reservedCounts={reservedCounts}
-          historyCount={historyRecords?.length || 0}
-          loading={containerLoading}
-        />
-
-        <CalanderDayStrip
-          monthDays={monthDays}
-          selectedDate={selectedDate}
-          todayStr={todayStr}
-          summary={summary}
-          mode={MODE}
-          onDateSelect={(d) => openContainerForDate(d, { openLayer: false })}
-        />
-
+      <LayerModal open={calOpen} layerName="Meeting" title="📋 Meeting Calendar" sub="Desktop: Monthly Grid • Mobile: Day Strip" onClose={() => { setCalOpen(false); setContainerOpen(false); setAddOpen(false); setConfirmSingleOpen(false); setConfirmFamilyOpen(false); setChangeDateOpen(false); }} maxWidth="max-w-5xl">
+        <CalanderHeader anchor={anchor} mode={MODE} onPrevMonth={() => setAnchor(new Date(year, month - 1, 1))} onNextMonth={() => setAnchor(new Date(year, month + 1, 1))} />
+        <CalanderMobileHero container={container} mode={MODE} selectedDate={selectedDate} todayStr={todayStr} counts={counts} reservedCounts={reservedCounts} historyCount={historyRecords?.length || 0} loading={containerLoading} />
+        <CalanderDayStrip monthDays={monthDays} selectedDate={selectedDate} todayStr={todayStr} summary={summary} mode={MODE} onDateSelect={(d) => openContainerForDate(d, { openLayer: false })} />
         <div className="block md:hidden">
-          <ContainerPanel
-            container={container}
-            assignments={assignments}
-            reserved={reserved}
-            historyRecords={historyRecords}
-            counts={counts}
-            reservedCounts={reservedCounts}
-            mode={MODE}
-            role={role}
-            pushing={pushing}
-            housefull={housefull}
-            containerLoading={containerLoading}
-            selectedDate={selectedDate}
-            showList={showList}
-            onToggleList={() => setShowList((v) => !v)}
-            onOpenAdd={openAddCustomerLayer}
-            onIncreaseLimit={increaseLimit}
-            onUnlockContainer={unlockContainer}
-            onPrintAll={openPrintAllForContainer}
-            onPrintList={openPrintListForContainer}
-            onOpenProfile={openProfile}
-            onConfirm={openConfirmModal}
-            onReject={(a, seq) => {
-              setRejectTarget(a);
-              setRejectTargetSeq(seq);
-              setRejectOpen(true);
-            }}
-            onOut={outAssignment}
-            onDone={null}
-            onChangeDate={openChangeDateModal}
-            onShowWarn={showWarn}
-            variant="inline"
-          />
+          <ContainerPanel container={container} assignments={assignments} reserved={reserved} historyRecords={historyRecords} counts={counts} reservedCounts={reservedCounts} mode={MODE} role={role} pushing={pushing} housefull={housefull} containerLoading={containerLoading} selectedDate={selectedDate} showList={showList} onToggleList={() => setShowList((v) => !v)} onOpenAdd={openAddCustomerLayer} onIncreaseLimit={increaseLimit} onUnlockContainer={unlockContainer} onPrintAll={openPrintAllForContainer} onPrintList={openPrintListForContainer} onPrintToken={openPrintTokenForContainer} onOpenProfile={openProfile} onConfirm={openConfirmModal} onReject={(a, seq) => { setRejectTarget(a); setRejectTargetSeq(seq); setRejectOpen(true); }} onOut={outAssignment} onDone={null} onChangeDate={openChangeDateModal} onShowWarn={showWarn} variant="inline" />
         </div>
-
-        <CalanderMonthGrid
-          cells={cells}
-          month={month}
-          selectedDate={selectedDate}
-          todayStr={todayStr}
-          summary={summary}
-          mode={MODE}
-          onDateSelect={(d) => openContainerForDate(d, { openLayer: true })}
-        />
+        <CalanderMonthGrid cells={cells} month={month} selectedDate={selectedDate} todayStr={todayStr} summary={summary} mode={MODE} onDateSelect={(d) => openContainerForDate(d, { openLayer: true })} />
       </LayerModal>
 
-      {/* Layer 2: Container Desktop */}
-      <LayerModal
-        open={containerOpen && !!container}
-        layerName="Container"
-        title={container ? `${container.date} / MEETING` : "Container"}
-        sub={`Total ${counts.total}${historyRecords.length > 0 ? ` • ✅ ${historyRecords.length} confirmed` : ""}`}
-        onClose={() => {
-          setContainerOpen(false);
-          setAddOpen(false);
-          setConfirmSingleOpen(false);
-          setConfirmFamilyOpen(false);
-          setRejectOpen(false);
-          setRejectTarget(null);
-          setChangeDateOpen(false);
-          setContainer(null);
-          setAssignments([]);
-          setReserved([]);
-          setHistoryRecords([]);
-        }}
-        maxWidth="max-w-5xl"
-      >
-        <ContainerPanel
-          container={container}
-          assignments={assignments}
-          reserved={reserved}
-          historyRecords={historyRecords}
-          counts={counts}
-          reservedCounts={reservedCounts}
-          mode={MODE}
-          role={role}
-          pushing={pushing}
-          housefull={housefull}
-          containerLoading={containerLoading}
-          selectedDate={selectedDate}
-          showList={showList}
-          onToggleList={() => setShowList((v) => !v)}
-          onOpenAdd={openAddCustomerLayer}
-          onIncreaseLimit={increaseLimit}
-          onUnlockContainer={unlockContainer}
-          onPrintAll={openPrintAllForContainer}
-          onPrintList={openPrintListForContainer}
-          onOpenProfile={openProfile}
-          onConfirm={openConfirmModal}
-          onReject={(a, seq) => {
-            setRejectTarget(a);
-            setRejectTargetSeq(seq);
-            setRejectOpen(true);
-          }}
-          onOut={outAssignment}
-          onDone={null}
-          onChangeDate={openChangeDateModal}
-          onShowWarn={showWarn}
-          variant="default"
-        />
+      <LayerModal open={containerOpen && !!container} layerName="Container" title={container ? `${container.date} / MEETING` : "Container"} sub={`Total ${counts.total}${historyRecords.length > 0 ? ` • ✅ ${historyRecords.length} confirmed` : ""}`} onClose={() => { setContainerOpen(false); setAddOpen(false); setConfirmSingleOpen(false); setConfirmFamilyOpen(false); setRejectOpen(false); setRejectTarget(null); setChangeDateOpen(false); setContainer(null); setAssignments([]); setReserved([]); setHistoryRecords([]); }} maxWidth="max-w-5xl">
+        <ContainerPanel container={container} assignments={assignments} reserved={reserved} historyRecords={historyRecords} counts={counts} reservedCounts={reservedCounts} mode={MODE} role={role} pushing={pushing} housefull={housefull} containerLoading={containerLoading} selectedDate={selectedDate} showList={showList} onToggleList={() => setShowList((v) => !v)} onOpenAdd={openAddCustomerLayer} onIncreaseLimit={increaseLimit} onUnlockContainer={unlockContainer} onPrintAll={openPrintAllForContainer} onPrintList={openPrintListForContainer} onPrintToken={openPrintTokenForContainer} onOpenProfile={openProfile} onConfirm={openConfirmModal} onReject={(a, seq) => { setRejectTarget(a); setRejectTargetSeq(seq); setRejectOpen(true); }} onOut={outAssignment} onDone={null} onChangeDate={openChangeDateModal} onShowWarn={showWarn} variant="default" />
       </LayerModal>
 
-      {/* Reject */}
-      <RejectOptionsSheet
-        open={rejectOpen}
-        onClose={() => {
-          setRejectOpen(false);
-          setRejectTarget(null);
-          setRejectTargetSeq(null);
-        }}
-        rejectTarget={rejectTarget}
-        rejectTargetSeq={rejectTargetSeq}
-        pushing={pushing}
-        onTrash={rejectToTrash}
-        onPending={rejectToPending}
-        onApproveFor={handleApproveFor}
-      />
+      <RejectOptionsSheet open={rejectOpen} onClose={() => { setRejectOpen(false); setRejectTarget(null); setRejectTargetSeq(null); }} rejectTarget={rejectTarget} rejectTargetSeq={rejectTargetSeq} pushing={pushing} onTrash={rejectToTrash} onPending={rejectToPending} onApproveFor={handleApproveFor} />
+      <AddCustomerSheet open={addOpen} onClose={() => { setAddOpen(false); setConfirmSingleOpen(false); setConfirmFamilyOpen(false); }} sittingActive={sittingActive} pickMode={pickMode} onPickModeChange={(m) => { setPickMode(m); setSelectedIds([]); }} selectedIds={selectedIds} onToggleSelect={(id) => setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))} pushing={pushing} onInitiateSingle={initiateSingleAssign} onInitiateFamily={initiateFamilyAssign} />
 
-      {/* Add Customer */}
-      <AddCustomerSheet
-        open={addOpen}
-        onClose={() => {
-          setAddOpen(false);
-          setConfirmSingleOpen(false);
-          setConfirmFamilyOpen(false);
-        }}
-        sittingActive={sittingActive}
-        pickMode={pickMode}
-        onPickModeChange={(m) => {
-          setPickMode(m);
-          setSelectedIds([]);
-        }}
-        selectedIds={selectedIds}
-        onToggleSelect={(id) =>
-          setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
-        }
-        pushing={pushing}
-        onInitiateSingle={initiateSingleAssign}
-        onInitiateFamily={initiateFamilyAssign}
-      />
-
-      {/* Confirm Single */}
-      <LayerModal
-        open={confirmSingleOpen}
-        layerName="Confirm Single"
-        title="Confirm Single"
-        sub="Review → Push"
-        onClose={() => setConfirmSingleOpen(false)}
-        maxWidth="max-w-2xl"
-      >
+      <LayerModal open={confirmSingleOpen} layerName="Confirm Single" title="Confirm Single" sub="Review → Push" onClose={() => setConfirmSingleOpen(false)} maxWidth="max-w-2xl">
         <div style={{ borderRadius: 22, border: `1px solid ${c.surfaceBorder}`, background: c.surfaceBg, padding: 16 }}>
           {targetSingle ? (
             <div style={{ borderRadius: 18, border: `1px solid ${c.panelBorder}`, background: c.panelBg, padding: 14 }}>
@@ -968,173 +448,29 @@ export default function MeetingCalander({ role }) {
               <div style={{ fontSize: 12, color: c.t2, marginTop: 4 }}>{targetSingle.address || "—"}</div>
               <div style={{ fontSize: 11, color: c.t3, marginTop: 4 }}>Gender: {targetSingle.gender}</div>
             </div>
-          ) : (
-            <div style={{ color: c.t3 }}>No customer selected.</div>
-          )}
+          ) : (<div style={{ color: c.t3 }}>No customer selected.</div>)}
           <div className="flex gap-2" style={{ marginTop: 16 }}>
-            <button
-              type="button"
-              onClick={() => setConfirmSingleOpen(false)}
-              style={{
-                flex: 1,
-                padding: "12px 16px",
-                borderRadius: 18,
-                background: c.btnGhostBg,
-                color: c.btnGhostText,
-                border: `1px solid ${c.btnGhostBorder}`,
-                cursor: "pointer",
-              }}
-            >
-              Back
-            </button>
-            <button
-              type="button"
-              onClick={() => confirmSinglePush()}
-              disabled={pushing || !targetSingle}
-              style={{
-                flex: 1,
-                padding: "12px 16px",
-                borderRadius: 18,
-                background: c.btnSolidBg,
-                color: c.btnSolidText,
-                fontWeight: 600,
-                border: "none",
-                cursor: pushing || !targetSingle ? "not-allowed" : "pointer",
-                opacity: pushing || !targetSingle ? 0.6 : 1,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 8,
-              }}
-            >
-              {pushing ? <BufferSpinner size={16} /> : null}
-              {pushing ? "Pushing..." : "Push Single"}
+            <button type="button" onClick={() => setConfirmSingleOpen(false)} style={{ flex: 1, padding: "12px 16px", borderRadius: 18, background: c.btnGhostBg, color: c.btnGhostText, border: `1px solid ${c.btnGhostBorder}`, cursor: "pointer" }}>Back</button>
+            <button type="button" onClick={() => confirmSinglePush()} disabled={pushing || !targetSingle} style={{ flex: 1, padding: "12px 16px", borderRadius: 18, background: c.btnSolidBg, color: c.btnSolidText, fontWeight: 600, border: "none", cursor: pushing || !targetSingle ? "not-allowed" : "pointer", opacity: pushing || !targetSingle ? 0.6 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              {pushing ? <BufferSpinner size={16} /> : null}{pushing ? "Pushing..." : "Push Single"}
             </button>
           </div>
         </div>
       </LayerModal>
 
-      {/* Confirm Family */}
-      <LayerModal
-        open={confirmFamilyOpen}
-        layerName="Confirm Family"
-        title={selectedIds.length === 2 ? "Confirm Couple" : "Confirm Family"}
-        sub="Review → Push"
-        onClose={() => setConfirmFamilyOpen(false)}
-        maxWidth="max-w-4xl"
-      >
+      <LayerModal open={confirmFamilyOpen} layerName="Confirm Family" title={selectedIds.length === 2 ? "Confirm Couple" : "Confirm Family"} sub="Review → Push" onClose={() => setConfirmFamilyOpen(false)} maxWidth="max-w-4xl">
         <div className="flex gap-2" style={{ marginTop: 16 }}>
-          <button
-            type="button"
-            onClick={() => setConfirmFamilyOpen(false)}
-            style={{
-              flex: 1,
-              padding: "12px 16px",
-              borderRadius: 18,
-              background: c.btnGhostBg,
-              color: c.btnGhostText,
-              border: `1px solid ${c.btnGhostBorder}`,
-              cursor: "pointer",
-            }}
-          >
-            Back
-          </button>
-          <button
-            type="button"
-            onClick={() => confirmFamilyPush()}
-            disabled={pushing || selectedIds.length < 2}
-            style={{
-              flex: 1,
-              padding: "12px 16px",
-              borderRadius: 18,
-              background: c.btnSolidBg,
-              color: c.btnSolidText,
-              fontWeight: 600,
-              border: "none",
-              cursor: pushing || selectedIds.length < 2 ? "not-allowed" : "pointer",
-              opacity: pushing || selectedIds.length < 2 ? 0.6 : 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-            }}
-          >
-            {pushing ? <BufferSpinner size={16} /> : null}
-            {pushing ? "Pushing..." : selectedIds.length === 2 ? "Push Couple" : "Push Family"}
+          <button type="button" onClick={() => setConfirmFamilyOpen(false)} style={{ flex: 1, padding: "12px 16px", borderRadius: 18, background: c.btnGhostBg, color: c.btnGhostText, border: `1px solid ${c.btnGhostBorder}`, cursor: "pointer" }}>Back</button>
+          <button type="button" onClick={() => confirmFamilyPush()} disabled={pushing || selectedIds.length < 2} style={{ flex: 1, padding: "12px 16px", borderRadius: 18, background: c.btnSolidBg, color: c.btnSolidText, fontWeight: 600, border: "none", cursor: pushing || selectedIds.length < 2 ? "not-allowed" : "pointer", opacity: pushing || selectedIds.length < 2 ? 0.6 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            {pushing ? <BufferSpinner size={16} /> : null}{pushing ? "Pushing..." : selectedIds.length === 2 ? "Push Couple" : "Push Family"}
           </button>
         </div>
       </LayerModal>
 
-      {/* Confirm Diksha */}
-      <ConfirmDikshaSheet
-        open={confirmModalOpen}
-        onClose={() => {
-          setConfirmModalOpen(false);
-          setConfirmModalTarget(null);
-        }}
-        target={confirmModalTarget}
-        pushing={pushing}
-        onConfirm={confirmMeetingCard}
-      />
-
-      {/* Change Date Modal */}
-      <ChangeDateModal
-        open={changeDateOpen}
-        onClose={() => {
-          setChangeDateOpen(false);
-          setChangeDateAssignment(null);
-          setChangeDateGroupMembers([]);
-        }}
-        mode={MODE}
-        container={container}
-        assignment={changeDateAssignment}
-        groupMembers={changeDateGroupMembers}
-        pushing={pushing}
-        onExecuteMove={executeChangeDate}
-        onShowWarn={showWarn}
-        requestCommit={requestCommit}
-      />
-
-      {/* Profile */}
-      <CustomerProfileModal
-        open={profileOpen}
-        onClose={() => {
-          setProfileOpen(false);
-          setProfileCustomer(null);
-          setProfileCtx(null);
-          setProfileSeqNo(null);
-        }}
-        customer={profileCustomer}
-        source="SITTING"
-        sequenceNo={profileSeqNo}
-        initialApproveStep={profileCtx?.initialApproveStep || null}
-        contextContainerId={profileCtx?.containerId || null}
-        contextAssignmentId={profileCtx?.assignmentId || null}
-        onChanged={async () => {
-          await refreshContainer();
-          await loadSummary();
-        }}
-      />
-
-      {/* Occupy Picker */}
-      <DikshaOccupyPickerModal
-        open={occupyOpen}
-        groupSize={occupyCtx?.groupSize || 1}
-        meetingDate={container?.date || null}
-        onClose={() => {
-          setOccupyOpen(false);
-          setOccupyCtx(null);
-        }}
-        onPick={async (dateKey) => {
-          const ctx = occupyCtx;
-          setOccupyOpen(false);
-          setOccupyCtx(null);
-          if (!ctx) return;
-          if (ctx.type === "SINGLE") await confirmSinglePush({ occupyDate: dateKey });
-          else await confirmFamilyPush({ occupyDate: dateKey });
-        }}
-      />
-
+      <ConfirmDikshaSheet open={confirmModalOpen} onClose={() => { setConfirmModalOpen(false); setConfirmModalTarget(null); }} target={confirmModalTarget} pushing={pushing} onConfirm={confirmMeetingCard} />
+      <ChangeDateModal open={changeDateOpen} onClose={() => { setChangeDateOpen(false); setChangeDateAssignment(null); setChangeDateGroupMembers([]); }} mode={MODE} container={container} assignment={changeDateAssignment} groupMembers={changeDateGroupMembers} pushing={pushing} onExecuteMove={executeChangeDate} onShowWarn={showWarn} requestCommit={requestCommit} />
+      <CustomerProfileModal open={profileOpen} onClose={() => { setProfileOpen(false); setProfileCustomer(null); setProfileCtx(null); setProfileSeqNo(null); }} customer={profileCustomer} source="SITTING" sequenceNo={profileSeqNo} initialApproveStep={profileCtx?.initialApproveStep || null} contextContainerId={profileCtx?.containerId || null} contextAssignmentId={profileCtx?.assignmentId || null} onChanged={async () => { await refreshContainer(); await loadSummary(); }} />
+      <DikshaOccupyPickerModal open={occupyOpen} groupSize={occupyCtx?.groupSize || 1} meetingDate={container?.date || null} onClose={() => { setOccupyOpen(false); setOccupyCtx(null); }} onPick={async (dateKey) => { const ctx = occupyCtx; setOccupyOpen(false); setOccupyCtx(null); if (!ctx) return; if (ctx.type === "SINGLE") await confirmSinglePush({ occupyDate: dateKey }); else await confirmFamilyPush({ occupyDate: dateKey }); }} />
       {CommitModal}
     </div>
   );

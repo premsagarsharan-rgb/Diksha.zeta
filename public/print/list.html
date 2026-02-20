@@ -28,6 +28,16 @@
     th { background: #f2f2f2; text-align: left; }
     td.small { white-space: nowrap; }
 
+    /* ✅ NEW: Approver cell styling (uppercase + bold + better font) */
+    td.approverCell {
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-family: "Arial Black", Arial, sans-serif;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
     .sectionTitle { margin: 14px 0 8px; font-weight: 900; font-size: 13px; }
 
     @media print {
@@ -59,11 +69,16 @@
       <table>
         <thead>
           <tr>
-            <th style="width:40px;">#</th>
+            <th style="width:80px;">Occupied</th>
+            <th style="width:40px;">Sr</th>
             <th>Name</th>
+            <!-- ✅ NEW COLUMN (after Name): Approver -->
+            <th style="width:110px;">Approver</th>
             <th style="width:75px;">Gender</th>
-            <th style="width:130px;">Phone</th>
+            <th style="width:90px;">Marital</th>
+            <th style="width:110px;">Family Consent</th>
             <th>Place</th>
+            <th style="width:130px;">Contact</th>
             <th style="width:120px;">SN</th>
           </tr>
         </thead>

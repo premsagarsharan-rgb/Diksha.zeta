@@ -1,4 +1,6 @@
-// middleware.js
+;// middleware.js
+// ✅ MODIFIED — API + page tracking headers added
+
 import { NextResponse } from "next/server";
 
 function isSessionCookieStructurallyValid(cookieValue) {
@@ -31,6 +33,15 @@ export function middleware(req) {
 
   const isDashboard = pathname.startsWith("/dashboard");
   const isLogin = pathname === "/login";
+  const isApi = pathname.startsWith("/api");
+
+  // ═══════ API RATE TRACKING HEADER ═══════
+  if (isApi && sessionCookie) {
+    const res = NextResponse.next();
+    res.headers.set("x-request-time", new Date().toISOString());
+    res.headers.set("x-request-path", pathname);
+    return res;
+  }
 
   // === DASHBOARD ===
   if (isDashboard) {
@@ -42,16 +53,15 @@ export function middleware(req) {
       return clearCookieAndRedirectToLogin(req);
     }
 
-    // Cookie structurally valid — page me DB check hoga
-    // Agar DB check fail hoga → page redirect karega /login
-    // Middleware /login pe NextResponse.next() karega → loop nahi banega
-    return NextResponse.next();
+    // ✅ Add tracking headers for dashboard pages
+    const res = NextResponse.next();
+    res.headers.set("x-page-visit", pathname);
+    res.headers.set("x-visit-time", new Date().toISOString());
+    return res;
   }
 
   // === LOGIN — KABHI REDIRECT MAT KARO ===
   if (isLogin) {
-    // Ye line hi poora loop tod rahi hai
-    // Chahe cookie ho ya na ho — login page HAMESHA accessible
     return NextResponse.next();
   }
 
@@ -70,5 +80,5 @@ export function middleware(req) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login", "/"],
+  matcher: ["/dashboard/:path*", "/login", "/", "/api/:path*"],
 };
